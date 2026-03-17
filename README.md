@@ -50,6 +50,30 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Generar animacion
+
+Puedes generar un GIF con la evolucion completa de las curvas:
+
+```bash
+python3 scripts/generate_curve_animation.py \
+  --source csv \
+  --csv-path sample_data/demo_rates.csv \
+  --start-date 2018-01-01 \
+  --end-date 2018-10-01 \
+  --model nelson-siegel \
+  --columns SPC_2Y SPC_3Y SPC_4Y SPC_5Y SPC_10Y \
+  --output outputs/curve_evolution.gif
+```
+
+Tambien soporta `--source bcch` usando `--user` y `--password`.
+
+Tambien puedes usar variables de entorno:
+
+```bash
+export BCCH_USER="tu_usuario"
+export BCCH_PASSWORD="tu_password"
+```
+
 ## Fuente de datos
 
 La app puede trabajar de tres maneras:

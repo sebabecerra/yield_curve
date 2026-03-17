@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 yield_curve/__pycache__/
+.env
+.matplotlib/
+outputs/

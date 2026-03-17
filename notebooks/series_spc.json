@@ -1,4 +1,8 @@
 {
+  "TPM": "F022.TPM.TIN.D001.NO.Z.D",
+  "SCP 90 días": "F022.SPC.TPR.D090.NO.Z.D",
+  "SCP 180 días": "F022.SPC.TPR.D180.NO.Z.D",
+  "SCP 360 días": "F022.SPC.TPR.D360.NO.Z.D",
   "SPC en pesos 2 años": "F022.SPC.TIN.AN02.NO.Z.D",
   "SPC en pesos 3 años": "F022.SPC.TIN.AN03.NO.Z.D",
   "SPC en pesos 4 años": "F022.SPC.TIN.AN04.NO.Z.D",

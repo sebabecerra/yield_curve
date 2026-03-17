@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import io
+import os
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover
+    load_dotenv = None
 
 from yield_curve import (
     DEFAULT_NS_COLUMNS,
@@ -20,6 +26,9 @@ from yield_curve import (
 )
 
 st.set_page_config(page_title="Yield Curve", layout="wide")
+
+if load_dotenv is not None:
+    load_dotenv("/Users/sbc/projects/yiled_curve/.env")
 
 BLOOMBERG_BG = "#0b0f14"
 BLOOMBERG_PANEL = "#11161d"
@@ -133,8 +142,8 @@ with st.sidebar:
                 options=list(RATE_SERIES.keys()),
                 default=DEFAULT_NS_COLUMNS,
             )
-            bcch_user = st.text_input("Usuario BCCh")
-            bcch_password = st.text_input("Contraseña BCCh", type="password")
+            bcch_user = st.text_input("Usuario BCCh", value=os.getenv("BCCH_USER", ""))
+            bcch_password = st.text_input("Contraseña BCCh", type="password", value=os.getenv("BCCH_PASSWORD", ""))
             start_date = st.date_input("Desde", value=pd.Timestamp("2018-01-01"))
             end_date = st.date_input("Hasta", value=pd.Timestamp.today())
             bcch_submit = st.form_submit_button("Entrar")

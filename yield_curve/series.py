@@ -14,6 +14,38 @@ class RateSeries:
 
 
 RATE_SERIES = {
+    "TPM": RateSeries(
+        key="TPM",
+        label="TPM",
+        code="F022.TPM.TIN.D001.NO.Z.D",
+        months=1,
+        currency="CLP",
+        family="money_market",
+    ),
+    "SCP90": RateSeries(
+        key="SCP90",
+        label="SCP 90 días",
+        code="F022.SPC.TPR.D090.NO.Z.D",
+        months=3,
+        currency="CLP",
+        family="money_market",
+    ),
+    "SCP180": RateSeries(
+        key="SCP180",
+        label="SCP 180 días",
+        code="F022.SPC.TPR.D180.NO.Z.D",
+        months=6,
+        currency="CLP",
+        family="money_market",
+    ),
+    "SCP360": RateSeries(
+        key="SCP360",
+        label="SCP 360 días",
+        code="F022.SPC.TPR.D360.NO.Z.D",
+        months=12,
+        currency="CLP",
+        family="money_market",
+    ),
     "SPC_2Y": RateSeries(
         key="SPC_2Y",
         label="SPC en pesos 2 años",
@@ -114,6 +146,10 @@ DEFAULT_NS_COLUMNS = [
 DEFAULT_DISCRETE_COLUMNS = DEFAULT_NS_COLUMNS.copy()
 
 LEGACY_RATE_ALIASES = {
+    "tpm": "TPM",
+    "scp90": "SCP90",
+    "scp180": "SCP180",
+    "scp360": "SCP360",
     "spc_pesos_2y": "SPC_2Y",
     "spc_pesos_3y": "SPC_3Y",
     "spc_pesos_4y": "SPC_4Y",

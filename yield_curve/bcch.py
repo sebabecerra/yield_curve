@@ -4,8 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 
-import bcchapi
-
 from .series import RATE_SERIES
 
 
@@ -19,6 +17,8 @@ def fetch_bcch_series(
 ) -> pd.DataFrame:
     if not user or not password:
         raise ValueError("Debes ingresar usuario y contraseña de BCCh.")
+
+    import bcchapi
 
     siete = bcchapi.Siete(user, password)
 
