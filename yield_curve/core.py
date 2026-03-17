@@ -36,6 +36,13 @@ def prepare_rates_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     for column in rate_columns:
         prepared[column] = pd.to_numeric(prepared[column], errors="coerce")
 
+    if not rate_columns:
+        raise ValueError("El archivo debe incluir al menos una columna de tasas.")
+
+    prepared = prepared.dropna(subset=rate_columns, how="any")
+    if prepared.empty:
+        raise ValueError("No quedaron filas completas después de eliminar NA en las columnas de tasas.")
+
     return prepared.reset_index(drop=True)
 
 
@@ -94,6 +101,7 @@ def fit_nelson_siegel(
     lambda_value: float = 0.0609,
 ) -> NelsonSiegelResult:
     columns = columns or DEFAULT_NS_COLUMNS
+    columns = sorted(columns, key=lambda column: RATE_MATURITY_MONTHS[column])
     observed = df[["Date", *columns]].dropna().copy()
     if observed.empty:
         raise ValueError("No hay suficientes datos completos para ajustar Nelson-Siegel.")

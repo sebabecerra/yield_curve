@@ -67,6 +67,7 @@ def _download_button(df: pd.DataFrame, label: str, filename: str) -> None:
 st.title("Yield Curve App")
 st.caption("App base construida desde los notebooks del proyecto para ajustar y visualizar curvas de tasa.")
 
+bcch_submit = False
 with st.sidebar:
     st.header("Datos")
     source_mode = st.radio("Fuente", options=["BCCh", "CSV"], index=0)
@@ -77,21 +78,26 @@ with st.sidebar:
     )
     st.caption("Series disponibles: " + ", ".join(RATE_SERIES.keys()))
     if source_mode == "BCCh":
-        bcch_series = st.multiselect(
-            "Series BCCh",
-            options=list(RATE_SERIES.keys()),
-            default=DEFAULT_NS_COLUMNS,
-        )
-        bcch_user = st.text_input("Usuario BCCh")
-        bcch_password = st.text_input("Contraseña BCCh", type="password")
-        start_date = st.date_input("Desde", value=pd.Timestamp("2018-01-01"))
-        end_date = st.date_input("Hasta", value=pd.Timestamp.today())
+        with st.form("bcch_form"):
+            bcch_series = st.multiselect(
+                "Series BCCh",
+                options=list(RATE_SERIES.keys()),
+                default=DEFAULT_NS_COLUMNS,
+            )
+            bcch_user = st.text_input("Usuario BCCh")
+            bcch_password = st.text_input("Contraseña BCCh", type="password")
+            start_date = st.date_input("Desde", value=pd.Timestamp("2018-01-01"))
+            end_date = st.date_input("Hasta", value=pd.Timestamp.today())
+            bcch_submit = st.form_submit_button("Entrar")
 
 if source_mode == "CSV" and uploaded_file is not None:
     source_df = pd.read_csv(uploaded_file)
 elif source_mode == "BCCh":
     if not bcch_user or not bcch_password:
         st.info("Ingresa tus credenciales BCCh y selecciona las series para trabajar con datos efectivos.")
+        st.stop()
+    if not bcch_submit:
+        st.info("Completa las credenciales y presiona `Entrar` para cargar los datos de BCCh.")
         st.stop()
     try:
         source_df = fetch_bcch_series(
@@ -108,6 +114,7 @@ else:
     st.info("Sube un CSV real para continuar.")
     st.stop()
 
+raw_row_count = len(source_df)
 try:
     rates_df = prepare_rates_dataframe(source_df)
 except ValueError as exc:
@@ -119,19 +126,87 @@ if not available_columns:
     st.error("No se encontraron columnas de tasas para procesar.")
     st.stop()
 
-tab_data, tab_ns, tab_discrete = st.tabs(["Datos", "Nelson-Siegel", "Modelo discreto"])
+tab_about, tab_data, tab_ns, tab_discrete = st.tabs(
+    ["Modelo", "Datos", "Nelson-Siegel", "Modelo discreto"]
+)
+
+with tab_about:
+    st.subheader("Qué hace la app")
+    st.markdown(
+        """
+        Esta app estima una curva de tasas a partir de observaciones efectivas de mercado.
+
+        Usa dos enfoques:
+
+        - `Nelson-Siegel clásico`: ajusta factores `level`, `slope` y `curvature` por fecha.
+        - `Modelo discreto`: ajusta una versión discreta del modelo usando `phi` y reconstruye la curva por madurez.
+        """
+    )
+
+    st.subheader("Cómo entran los datos")
+    st.markdown(
+        """
+        La app trabaja solo con datos efectivos:
+
+        - `BCCh`: descarga series desde el servicio `SieteRestWS` usando tus credenciales.
+        - `CSV`: carga un archivo local con columna `Date` y columnas de tasas.
+
+        Las series disponibles vienen del catálogo normalizado del proyecto y usan alias como:
+        `spc_pesos_2y`, `spc_pesos_3y`, `spc_pesos_4y`, `spc_pesos_5y`, `spc_pesos_10y`.
+        """
+    )
+
+    st.subheader("Limpieza de datos")
+    st.markdown(
+        """
+        Antes de estimar, la app:
+
+        - convierte `Date` a fecha
+        - convierte las columnas de tasas a numéricas
+        - elimina cualquier fila que tenga `NA` en alguna tasa seleccionada
+
+        Las curvas se calculan sobre el dataset limpio que ves en la pestaña `Datos`.
+        """
+    )
+
+    st.subheader("Cómo se calcula cada modelo")
+    st.markdown(
+        """
+        `Nelson-Siegel`:
+
+        - toma una sección transversal de tasas por fecha
+        - construye las cargas de `level`, `slope` y `curvature`
+        - usa `lambda = 0.0609` fijo, siguiendo el notebook original
+        - estima los betas por mínimos cuadrados
+        - reconstruye una curva continua sobre la duración
+
+        `Modelo discreto`:
+
+        - usa las madureces discretas definidas en el catálogo
+        - calibra `phi` por grilla o usa un valor manual
+        - estima betas por mínimos cuadrados
+        - reconstruye la curva entre 1 y 120 meses
+        """
+    )
+
+    st.subheader("Cómo leer los gráficos")
+    st.markdown(
+        """
+        - `Tasas observadas`: puntos efectivos disponibles en la fecha o mes elegido.
+        - `Curva estimada`: línea ajustada por el modelo.
+        - `Factores`: evolución temporal de los parámetros estimados.
+        """
+    )
 
 with tab_data:
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader("Vista previa")
-        st.dataframe(rates_df, use_container_width=True, hide_index=True)
-    with col2:
-        st.subheader("Resumen")
-        st.metric("Filas", len(rates_df))
-        st.metric("Fecha inicial", rates_df["Date"].min().date().isoformat())
-        st.metric("Fecha final", rates_df["Date"].max().date().isoformat())
-        _download_button(rates_df, "Descargar datos cargados", "rates_input.csv")
+    st.subheader("Datos limpios usados en la estimación")
+    removed_rows = raw_row_count - len(rates_df)
+    st.caption(
+        f"Filas originales: {raw_row_count} | Filas usadas: {len(rates_df)} | "
+        f"Filas eliminadas por NA: {removed_rows}"
+    )
+    st.dataframe(rates_df, use_container_width=True, hide_index=True)
+    _download_button(rates_df, "Descargar datos limpios", "rates_input_clean.csv")
 
 with tab_ns:
     st.subheader("Ajuste Nelson-Siegel clásico")
@@ -141,12 +216,24 @@ with tab_ns:
         options=available_columns,
         default=default_ns or available_columns[: min(5, len(available_columns))],
     )
-    lambda_value = st.number_input("Lambda", min_value=0.001, max_value=2.0, value=0.0609, step=0.001, format="%.4f")
+    lambda_value = st.number_input(
+        "Lambda",
+        min_value=0.001,
+        max_value=2.0,
+        value=0.0609,
+        step=0.001,
+        format="%.4f",
+    )
 
     if len(ns_columns) < 3:
         st.info("Selecciona al menos 3 tasas para estimar la curva.")
     else:
-        ns_result = fit_nelson_siegel(rates_df, columns=ns_columns, lambda_value=lambda_value)
+        ns_result = fit_nelson_siegel(
+            rates_df,
+            columns=ns_columns,
+            lambda_value=lambda_value,
+        )
+        st.metric("Lambda usada", f"{ns_result.lambda_value:.2f}")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**Factores estimados**")
@@ -181,7 +268,7 @@ with tab_ns:
             continuous_curve = reconstruct_nelson_siegel_curve(
                 continuous_years,
                 latest_betas,
-                lambda_value,
+                ns_result.lambda_value,
             )
             fig_ns = go.Figure()
             fig_ns.add_trace(
@@ -302,7 +389,7 @@ with tab_discrete:
         )
 
 template_buffer = io.StringIO()
-build_demo_dataset().iloc[:0].to_csv(template_buffer, index=False)
+pd.DataFrame(columns=["Date", *DEFAULT_NS_COLUMNS]).to_csv(template_buffer, index=False)
 st.sidebar.download_button(
     "Descargar plantilla CSV",
     data=template_buffer.getvalue().encode("utf-8"),
