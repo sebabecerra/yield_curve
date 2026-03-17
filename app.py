@@ -132,7 +132,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Sube un CSV", type=["csv"], disabled=source_mode != "CSV")
     st.markdown(
         "Formato esperado: columna `Date` más columnas con alias del catálogo, por ejemplo "
-        "`SPC_2Y`, `SPC_3Y`, `SPC_4Y`, `SPC_5Y`, `SPC_10Y`."
+        "`TPM`, `SPC_03Y`, `SPC_06Y`, `SPC_1Y`, `SPC_2Y`, `SPC_3Y`, `SPC_4Y`, `SPC_5Y`, `SPC_10Y`."
     )
     st.caption("Series disponibles: " + ", ".join(RATE_SERIES.keys()))
     if source_mode == "BCCh":
@@ -147,6 +147,10 @@ with st.sidebar:
             start_date = st.date_input("Desde", value=pd.Timestamp("2018-01-01"))
             end_date = st.date_input("Hasta", value=pd.Timestamp.today())
             bcch_submit = st.form_submit_button("Entrar")
+        if st.button("Recargar series por defecto"):
+            st.session_state.bcch_loaded = False
+            st.session_state.pop("bcch_series", None)
+            st.rerun()
 
 if source_mode == "CSV" and uploaded_file is not None:
     source_df = pd.read_csv(uploaded_file)

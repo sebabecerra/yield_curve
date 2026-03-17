@@ -176,14 +176,22 @@ def create_animation(dates: list[pd.Timestamp], curves: dict[pd.Timestamp, dict[
     ax.set_ylim(y_min - padding, y_max + padding)
 
     line, = ax.plot([], [], color=BLOOMBERG_CURVE, linewidth=2.5, label="Curva estimada")
+    observed_line, = ax.plot(
+        [],
+        [],
+        color=BLOOMBERG_POINTS,
+        linewidth=1.8,
+        linestyle="--",
+        alpha=0.9,
+        label="Tasas observadas",
+    )
     points = ax.scatter(
         [],
         [],
         color=BLOOMBERG_POINTS,
-        s=90,
-        label="Tasas observadas",
+        s=120,
         edgecolors=BLOOMBERG_BG,
-        linewidths=1.0,
+        linewidths=1.2,
         zorder=5,
     )
     title = ax.set_title("")
@@ -193,9 +201,10 @@ def create_animation(dates: list[pd.Timestamp], curves: dict[pd.Timestamp, dict[
         date = dates[frame_idx]
         payload = curves[date]
         line.set_data(payload["curve_months"], payload["estimated"])
+        observed_line.set_data(payload["observed_months"], payload["observed"])
         points.set_offsets(np.column_stack([payload["observed_months"], payload["observed"]]))
         title.set_text(f"Evolucion de la curva: {pd.Timestamp(date).strftime('%Y-%m-%d')}")
-        return line, points, title
+        return line, observed_line, points, title
 
     animation = FuncAnimation(fig, update, frames=len(dates), interval=1000 / fps, blit=False)
     output_path.parent.mkdir(parents=True, exist_ok=True)
