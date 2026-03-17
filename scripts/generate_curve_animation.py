@@ -73,6 +73,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fps", type=int, default=10)
     parser.add_argument("--step", type=int, default=1, help="Usa cada n-esima fecha para reducir frames.")
     parser.add_argument(
+        "--dynamic-y-axis",
+        action="store_true",
+        help="Ajusta el eje Y en cada frame usando las tasas observadas y estimadas de esa fecha.",
+    )
+    parser.add_argument(
         "--output",
         default="outputs/curve_evolution.gif",
         help="Ruta del GIF de salida.",
@@ -152,7 +157,13 @@ def build_curves(rates_df: pd.DataFrame, args: argparse.Namespace) -> tuple[list
     return dates, curves
 
 
-def create_animation(dates: list[pd.Timestamp], curves: dict[pd.Timestamp, dict[str, np.ndarray]], output_path: Path, fps: int) -> None:
+def create_animation(
+    dates: list[pd.Timestamp],
+    curves: dict[pd.Timestamp, dict[str, np.ndarray]],
+    output_path: Path,
+    fps: int,
+    dynamic_y_axis: bool,
+) -> None:
     fig, ax = plt.subplots(figsize=(10, 6), facecolor=BLOOMBERG_BG)
     ax.set_facecolor(BLOOMBERG_PANEL)
     for spine in ax.spines.values():
@@ -165,8 +176,8 @@ def create_animation(dates: list[pd.Timestamp], curves: dict[pd.Timestamp, dict[
     ax.set_xlabel("Madurez (meses)")
     ax.set_ylabel("Tasa")
     ax.set_xlim(
-        float(min(payload["curve_months"][0] for payload in curves.values())),
-        float(max(payload["curve_months"][-1] for payload in curves.values())),
+        float(min(payload["curve_months"][0] for payload in curves.values()) - 6),
+        float(max(payload["curve_months"][-1] for payload in curves.values()) + 5),
     )
 
     all_values = np.concatenate([np.r_[payload["estimated"], payload["observed"]] for payload in curves.values()])
@@ -203,6 +214,12 @@ def create_animation(dates: list[pd.Timestamp], curves: dict[pd.Timestamp, dict[
         line.set_data(payload["curve_months"], payload["estimated"])
         observed_line.set_data(payload["observed_months"], payload["observed"])
         points.set_offsets(np.column_stack([payload["observed_months"], payload["observed"]]))
+        if dynamic_y_axis:
+            frame_values = np.r_[payload["estimated"], payload["observed"]]
+            frame_min = float(np.nanmin(frame_values))
+            frame_max = float(np.nanmax(frame_values))
+            frame_padding = max((frame_max - frame_min) * 0.12, 0.05)
+            ax.set_ylim(frame_min - frame_padding, frame_max + frame_padding)
         title.set_text(f"Evolucion de la curva: {pd.Timestamp(date).strftime('%Y-%m-%d')}")
         return line, observed_line, points, title
 
@@ -216,7 +233,13 @@ def main() -> None:
     args = parse_args()
     rates_df = load_rates(args)
     dates, curves = build_curves(rates_df, args)
-    create_animation(dates, curves, Path(args.output), fps=args.fps)
+    create_animation(
+        dates,
+        curves,
+        Path(args.output),
+        fps=args.fps,
+        dynamic_y_axis=args.dynamic_y_axis,
+    )
     print(f"GIF generado en: {args.output}")
 
 

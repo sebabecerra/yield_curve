@@ -5,3 +5,5 @@ yield_curve/__pycache__/
 .env
 .matplotlib/
 outputs/
+.DS_Store
+papers/*.csv

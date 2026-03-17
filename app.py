@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -28,7 +29,7 @@ from yield_curve import (
 st.set_page_config(page_title="Yield Curve", layout="wide")
 
 if load_dotenv is not None:
-    load_dotenv("/Users/sbc/projects/yiled_curve/.env")
+    load_dotenv(Path(__file__).resolve().parent / ".env")
 
 BLOOMBERG_BG = "#0b0f14"
 BLOOMBERG_PANEL = "#11161d"
