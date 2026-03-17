@@ -8,13 +8,14 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from yield_curve import (
-    DEFAULT_DISCRETE_COLUMNS,
     DEFAULT_NS_COLUMNS,
     RATE_SERIES,
     fetch_bcch_series,
-    fit_discrete_nelson_siegel,
     fit_nelson_siegel,
+    fit_svensson,
     reconstruct_nelson_siegel_curve,
+    reconstruct_cubic_spline_curve,
+    reconstruct_svensson_curve,
     prepare_rates_dataframe,
 )
 
@@ -27,6 +28,7 @@ BLOOMBERG_TEXT = "#d7dde5"
 BLOOMBERG_CURVE = "#f5a623"
 BLOOMBERG_POINTS = "#ffd166"
 BLOOMBERG_FACTOR = "#00c2ff"
+BLOOMBERG_COMPARE = "#7ae582"
 
 
 def _apply_bloomberg_style(fig: go.Figure, xaxis_title: str = "", yaxis_title: str = "") -> None:
@@ -62,6 +64,46 @@ def _apply_bloomberg_style(fig: go.Figure, xaxis_title: str = "", yaxis_title: s
 def _download_button(df: pd.DataFrame, label: str, filename: str) -> None:
     csv_bytes = df.to_csv(index=False).encode("utf-8")
     st.download_button(label, data=csv_bytes, file_name=filename, mime="text/csv")
+
+
+def _line_trace(x: object, y: object, name: str, color: str, width: int = 3) -> go.Scatter:
+    return go.Scatter(
+        x=x,
+        y=y,
+        mode="lines",
+        name=name,
+        line={"color": color, "width": width},
+        hovertemplate="Madurez: %{x:.0f} meses<br>Tasa: %{y:.4f}<extra></extra>",
+    )
+
+
+def _marker_trace(x: object, y: object, name: str, color: str, size: int = 10) -> go.Scatter:
+    return go.Scatter(
+        x=x,
+        y=y,
+        mode="markers",
+        name=name,
+        marker={"size": size, "color": color, "line": {"color": BLOOMBERG_BG, "width": 1}},
+        hovertemplate="Madurez: %{x:.0f} meses<br>Tasa: %{y:.4f}<extra></extra>",
+    )
+
+
+def _curve_date_selection(available_dates: list[str], key_prefix: str) -> list[str]:
+    base_date = st.selectbox(
+        "Fecha base",
+        options=available_dates,
+        index=len(available_dates) - 1,
+        key=f"{key_prefix}_base_date",
+    )
+    compare_dates = st.multiselect(
+        "Fechas a comparar",
+        options=[date for date in available_dates if date != base_date],
+        default=[],
+        max_selections=2,
+        key=f"{key_prefix}_compare_dates",
+        help="Puedes seleccionar hasta 2 fechas adicionales. Con la fecha base, el máximo total es 3.",
+    )
+    return [base_date, *compare_dates]
 
 
 st.title("Yield Curve App")
@@ -136,9 +178,10 @@ available_columns = [column for column in rates_df.columns if column != "Date"]
 if not available_columns:
     st.error("No se encontraron columnas de tasas para procesar.")
     st.stop()
+default_curve_columns = [column for column in DEFAULT_NS_COLUMNS if column in available_columns]
 
-tab_about, tab_data, tab_ns, tab_discrete = st.tabs(
-    ["Modelo", "Datos", "Nelson-Siegel", "Modelo discreto"]
+tab_about, tab_data, tab_ns, tab_svensson, tab_spline = st.tabs(
+    ["Modelo", "Datos", "Nelson-Siegel", "Svensson", "Cubic spline"]
 )
 
 with tab_about:
@@ -147,10 +190,11 @@ with tab_about:
         """
         Esta app estima una curva de tasas a partir de observaciones efectivas de mercado.
 
-        Usa dos enfoques:
+        Usa varios enfoques:
 
         - `Nelson-Siegel clásico`: ajusta factores `level`, `slope` y `curvature` por fecha.
-        - `Modelo discreto`: ajusta una versión discreta del modelo usando `phi` y reconstruye la curva por madurez.
+        - `Nelson-Siegel-Svensson`: extiende Nelson-Siegel con un segundo factor de curvatura.
+        - `Cubic spline`: interpola una curva suave directamente sobre los nodos observados.
         """
     )
 
@@ -191,12 +235,17 @@ with tab_about:
         - estima los betas por mínimos cuadrados
         - reconstruye una curva continua sobre la duración
 
-        `Modelo discreto`:
+        `Svensson`:
 
-        - usa las madureces discretas definidas en el catálogo
-        - calibra `phi` por grilla o usa un valor manual
+        - agrega un cuarto factor de curvatura
+        - usa dos parámetros `lambda`
         - estima betas por mínimos cuadrados
-        - reconstruye la curva entre 1 y 120 meses
+
+        `Cubic spline`:
+
+        - toma solo las tasas observadas disponibles
+        - ajusta una interpolación cúbica natural
+        - produce una curva suave sin factores latentes
         """
     )
 
@@ -223,11 +272,10 @@ with tab_data:
 
 with tab_ns:
     st.subheader("Ajuste Nelson-Siegel clásico")
-    default_ns = [column for column in DEFAULT_NS_COLUMNS if column in available_columns]
     ns_columns = st.multiselect(
         "Columnas para ajuste",
         options=available_columns,
-        default=default_ns or available_columns[: min(5, len(available_columns))],
+        default=default_curve_columns or available_columns[: min(5, len(available_columns))],
     )
     lambda_value = st.number_input(
         "Lambda",
@@ -246,25 +294,13 @@ with tab_ns:
             columns=ns_columns,
             lambda_value=lambda_value,
         )
-        st.metric("Lambda usada", f"{ns_result.lambda_value:.2f}")
         available_dates = ns_result.observed["Date"].dt.strftime("%Y-%m-%d").tolist()
-        selected_date_str = st.selectbox(
-            "Fecha base para curva Nelson-Siegel",
-            options=available_dates,
-            index=len(available_dates) - 1,
-        )
-        compare_ns = st.toggle("Comparar segunda fecha", value=False)
-        compare_date_str = None
-        if compare_ns:
-            compare_options = [date for date in available_dates if date != selected_date_str]
-            compare_date_str = st.selectbox(
-                "Segunda fecha Nelson-Siegel",
-                options=compare_options,
-                index=max(len(compare_options) - 2, 0) if compare_options else 0,
-            )
-        selected_date = pd.Timestamp(selected_date_str)
-        selected_observed_row = ns_result.observed.loc[ns_result.observed["Date"] == selected_date].iloc[-1]
-        selected_beta_row = ns_result.betas.loc[ns_result.betas["Date"] == selected_date].iloc[-1]
+        selected_ns_dates = _curve_date_selection(available_dates, "ns")
+        top_col1, top_col2, top_col3 = st.columns([1, 1, 2])
+        with top_col1:
+            st.metric("Lambda usada", f"{ns_result.lambda_value:.2f}")
+        with top_col2:
+            _download_button(ns_result.betas, "Descargar betas", "nelson_siegel_betas.csv")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**Factores estimados**")
@@ -281,6 +317,7 @@ with tab_ns:
                         mode="lines",
                         name=name,
                         line={"color": color, "width": 2},
+                        hovertemplate="Fecha: %{x|%Y-%m-%d}<br>Valor: %{y:.4f}<extra></extra>",
                     )
                 )
             _apply_bloomberg_style(fig_factors)
@@ -292,6 +329,7 @@ with tab_ns:
             continuous_months = np.arange(int(observed_maturities.min()), int(observed_maturities.max()) + 1, dtype=float)
             continuous_years = continuous_months / 12.0
             fig_ns = go.Figure()
+            ns_curve_exports = []
 
             def add_ns_curve(observed_row: pd.Series, beta_row: pd.Series, date_label: str, curve_color: str, point_color: str) -> None:
                 continuous_curve = reconstruct_nelson_siegel_curve(
@@ -299,158 +337,204 @@ with tab_ns:
                     beta_row,
                     ns_result.lambda_value,
                 )
+                fig_ns.add_trace(_line_trace(continuous_months, continuous_curve, f"Estimada {date_label}", curve_color))
                 fig_ns.add_trace(
-                    go.Scatter(
-                        x=continuous_months,
-                        y=continuous_curve,
-                        mode="lines",
-                        name=f"Estimda {date_label}",
-                        line={"color": curve_color, "width": 3},
+                    _marker_trace(
+                        observed_maturities,
+                        [observed_row[column] for column in ns_columns],
+                        f"Observada {date_label}",
+                        point_color,
                     )
                 )
-                fig_ns.add_trace(
-                    go.Scatter(
-                        x=observed_maturities,
-                        y=[observed_row[column] for column in ns_columns],
-                        mode="markers",
-                        name=f"Observada {date_label}",
-                        marker={"size": 10, "color": point_color, "line": {"color": BLOOMBERG_BG, "width": 1}},
+                ns_curve_exports.append(
+                    pd.DataFrame(
+                        {
+                            "Date": date_label,
+                            "MaturityMonths": continuous_months.astype(int),
+                            "EstimatedRate": continuous_curve,
+                        }
+                    )
+                )
+                ns_curve_exports.append(
+                    pd.DataFrame(
+                        {
+                            "Date": date_label,
+                            "MaturityMonths": observed_maturities.astype(int),
+                            "ObservedRate": [observed_row[column] for column in ns_columns],
+                        }
                     )
                 )
 
-            add_ns_curve(selected_observed_row, selected_beta_row, selected_date_str, BLOOMBERG_CURVE, BLOOMBERG_POINTS)
-            if compare_ns and compare_date_str:
-                compare_date = pd.Timestamp(compare_date_str)
-                compare_observed_row = ns_result.observed.loc[ns_result.observed["Date"] == compare_date].iloc[-1]
-                compare_beta_row = ns_result.betas.loc[ns_result.betas["Date"] == compare_date].iloc[-1]
-                add_ns_curve(compare_observed_row, compare_beta_row, compare_date_str, BLOOMBERG_FACTOR, "#7ae582")
+            colors = [
+                (BLOOMBERG_CURVE, BLOOMBERG_POINTS),
+                (BLOOMBERG_FACTOR, BLOOMBERG_COMPARE),
+                ("#ff6b6b", "#c7f464"),
+            ]
+            for idx, date_str in enumerate(selected_ns_dates):
+                date_value = pd.Timestamp(date_str)
+                observed_row = ns_result.observed.loc[ns_result.observed["Date"] == date_value].iloc[-1]
+                beta_row = ns_result.betas.loc[ns_result.betas["Date"] == date_value].iloc[-1]
+                curve_color, point_color = colors[idx]
+                add_ns_curve(observed_row, beta_row, date_str, curve_color, point_color)
             _apply_bloomberg_style(fig_ns, xaxis_title="Madurez (meses)", yaxis_title="Tasa")
             fig_ns.update_layout(height=320)
             st.plotly_chart(fig_ns, use_container_width=True)
+        with top_col3:
+            _download_button(
+                pd.concat(ns_curve_exports, ignore_index=True),
+                "Descargar curvas",
+                "nelson_siegel_curves.csv",
+            )
 
         betas_display = ns_result.betas.copy()
         betas_display["Date"] = betas_display["Date"].dt.strftime("%Y-%m-%d")
         st.dataframe(betas_display, use_container_width=True, hide_index=True)
-        _download_button(ns_result.betas, "Descargar betas Nelson-Siegel", "nelson_siegel_betas.csv")
 
-with tab_discrete:
-    st.subheader("Modelo discreto con calibración de phi")
-    default_discrete = [column for column in DEFAULT_DISCRETE_COLUMNS if column in available_columns]
-    discrete_columns = st.multiselect(
-        "Columnas para ajuste discreto",
+with tab_svensson:
+    st.subheader("Nelson-Siegel-Svensson")
+    sv_columns = st.multiselect(
+        "Columnas para Svensson",
         options=available_columns,
-        default=default_discrete or available_columns,
+        default=default_curve_columns or available_columns[: min(5, len(available_columns))],
+        key="sv_columns",
     )
-    calibrate_phi = st.toggle("Calibrar phi por grilla", value=True)
-    manual_phi = st.slider("Phi manual", min_value=0.10, max_value=0.98, value=0.93, step=0.01, disabled=calibrate_phi)
+    sv_dates = rates_df["Date"].dt.strftime("%Y-%m-%d").tolist()
+    selected_sv_dates = _curve_date_selection(sv_dates, "sv")
 
-    if len(discrete_columns) < 3:
-        st.info("Selecciona al menos 3 tasas para estimar el modelo discreto.")
+    if len(sv_columns) < 3:
+        st.info("Selecciona al menos 3 tasas para estimar Svensson.")
     else:
-        discrete_result = fit_discrete_nelson_siegel(
-            rates_df,
-            columns=discrete_columns,
-            phi=None if calibrate_phi else manual_phi,
-        )
-        st.metric("Phi usado", f"{discrete_result.phi:.2f}")
+        sv_columns = sorted(sv_columns, key=lambda column: RATE_SERIES[column].months)
+        maturities = np.array([RATE_SERIES[column].months for column in sv_columns], dtype=float)
+        continuous_months = np.arange(int(maturities.min()), int(maturities.max()) + 1, dtype=float)
+        lambda1 = st.number_input("Lambda 1", min_value=0.001, max_value=2.0, value=0.0609, step=0.001, format="%.4f")
+        lambda2 = st.number_input("Lambda 2", min_value=0.001, max_value=2.0, value=0.2000, step=0.001, format="%.4f")
+        svensson_result = fit_svensson(rates_df, columns=sv_columns, lambda1_value=lambda1, lambda2_value=lambda2)
+        top_col1, top_col2, top_col3 = st.columns([1, 1, 2])
+        with top_col1:
+            st.metric("Lambda 1", f"{svensson_result.lambda1_value:.4f}")
+        with top_col2:
+            st.metric("Lambda 2", f"{svensson_result.lambda2_value:.4f}")
 
-        if not discrete_result.phi_summary.empty:
-            st.markdown("**Mejores valores de phi por error medio**")
-            st.dataframe(discrete_result.phi_summary.head(10), use_container_width=True, hide_index=True)
+        fig_sv = go.Figure()
+        sv_curve_exports = []
+        colors = [
+            (BLOOMBERG_CURVE, BLOOMBERG_POINTS),
+            (BLOOMBERG_FACTOR, BLOOMBERG_COMPARE),
+            ("#ff6b6b", "#c7f464"),
+        ]
+        for idx, date_str in enumerate(selected_sv_dates):
+            date_value = pd.Timestamp(date_str)
+            source_row = rates_df.loc[rates_df["Date"] == date_value, ["Date", *sv_columns]].iloc[-1]
+            beta_row = svensson_result.betas.loc[svensson_result.betas["Date"] == date_value].iloc[-1]
+            curve = reconstruct_svensson_curve(continuous_months / 12.0, beta_row, lambda1, lambda2)
+            curve_color, point_color = colors[idx]
+            fig_sv.add_trace(_line_trace(continuous_months, curve, f"Estimada {date_str}", curve_color))
+            fig_sv.add_trace(
+                _marker_trace(maturities, [source_row[column] for column in sv_columns], f"Observada {date_str}", point_color)
+            )
+            sv_curve_exports.append(
+                pd.DataFrame({"Date": date_str, "MaturityMonths": continuous_months.astype(int), "EstimatedRate": curve})
+            )
+            sv_curve_exports.append(
+                pd.DataFrame(
+                    {
+                        "Date": date_str,
+                        "MaturityMonths": maturities.astype(int),
+                        "ObservedRate": [source_row[column] for column in sv_columns],
+                    }
+                )
+            )
+        sv_display = svensson_result.betas.copy()
+        sv_display["Date"] = sv_display["Date"].dt.strftime("%Y-%m-%d")
 
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("**Betas mensuales**")
-            fig_betas = go.Figure()
+            fig_sv_betas = go.Figure()
             for name, color in [
-                ("Beta_Constante", BLOOMBERG_CURVE),
-                ("Beta_lambda2", BLOOMBERG_FACTOR),
-                ("Beta_lambda3", BLOOMBERG_POINTS),
+                ("level", BLOOMBERG_CURVE),
+                ("slope", BLOOMBERG_FACTOR),
+                ("curvature_1", BLOOMBERG_POINTS),
+                ("curvature_2", BLOOMBERG_COMPARE),
             ]:
-                fig_betas.add_trace(
+                fig_sv_betas.add_trace(
                     go.Scatter(
-                        x=discrete_result.monthly_betas["DateM"],
-                        y=discrete_result.monthly_betas[name],
+                        x=svensson_result.betas["Date"],
+                        y=svensson_result.betas[name],
                         mode="lines",
                         name=name,
                         line={"color": color, "width": 2},
+                        hovertemplate="Fecha: %{x|%Y-%m-%d}<br>Valor: %{y:.4f}<extra></extra>",
                     )
                 )
-            _apply_bloomberg_style(fig_betas)
-            fig_betas.update_layout(height=320)
-            st.plotly_chart(fig_betas, use_container_width=True)
+            _apply_bloomberg_style(fig_sv_betas)
+            fig_sv_betas.update_layout(height=320)
+            st.plotly_chart(fig_sv_betas, use_container_width=True)
         with col2:
-            available_months = discrete_result.reconstructed_curve["DateM"].drop_duplicates().sort_values()
-            available_month_labels = [month.strftime("%Y-%m-%d") for month in available_months]
-            selected_month_label = st.selectbox("Fecha base para curva reconstruida", options=available_month_labels)
-            compare_discrete = st.toggle("Comparar segunda fecha discreta", value=False)
-            compare_month_label = None
-            if compare_discrete:
-                compare_month_options = [month for month in available_month_labels if month != selected_month_label]
-                compare_month_label = st.selectbox(
-                    "Segunda fecha discreta",
-                    options=compare_month_options,
-                    index=max(len(compare_month_options) - 2, 0) if compare_month_options else 0,
-                )
-            selected_month = pd.Timestamp(selected_month_label)
-            curve_df = discrete_result.reconstructed_curve.loc[
-                discrete_result.reconstructed_curve["DateM"] == selected_month,
-                ["n", "Tasa_Estimada"],
-            ].set_index("n")
-            observed_df = discrete_result.observed_monthly.loc[
-                discrete_result.observed_monthly["DateM"] == selected_month,
-                ["n", "Valor_Tasa"],
-            ].set_index("n")
-            fig_discrete = go.Figure()
+            _apply_bloomberg_style(fig_sv, xaxis_title="Madurez (meses)", yaxis_title="Tasa")
+            fig_sv.update_layout(height=320)
+            st.plotly_chart(fig_sv, use_container_width=True)
+        with top_col3:
+            download_col1, download_col2 = st.columns(2)
+            with download_col1:
+                _download_button(sv_display, "Descargar betas", "svensson_betas.csv")
+            with download_col2:
+                _download_button(pd.concat(sv_curve_exports, ignore_index=True), "Descargar curvas", "svensson_curves.csv")
+        st.dataframe(sv_display, use_container_width=True, hide_index=True)
 
-            def add_discrete_curve(curve: pd.DataFrame, observed: pd.DataFrame, date_label: str, curve_color: str, point_color: str) -> None:
-                fig_discrete.add_trace(
-                    go.Scatter(
-                        x=curve.index,
-                        y=curve["Tasa_Estimada"],
-                        mode="lines",
-                        name=f"Estimda {date_label}",
-                        line={"color": curve_color, "width": 3},
-                    )
-                )
-                fig_discrete.add_trace(
-                    go.Scatter(
-                        x=observed.index,
-                        y=observed["Valor_Tasa"],
-                        mode="markers",
-                        name=f"Observada {date_label}",
-                        marker={"size": 9, "color": point_color, "line": {"color": BLOOMBERG_BG, "width": 1}},
-                    )
-                )
+with tab_spline:
+    st.subheader("Cubic spline")
+    spline_columns = st.multiselect(
+        "Columnas para Cubic spline",
+        options=available_columns,
+        default=default_curve_columns or available_columns[: min(5, len(available_columns))],
+        key="spline_columns",
+    )
+    spline_dates = rates_df["Date"].dt.strftime("%Y-%m-%d").tolist()
+    selected_spline_dates = _curve_date_selection(spline_dates, "spline")
 
-            add_discrete_curve(curve_df, observed_df, selected_month_label, BLOOMBERG_CURVE, BLOOMBERG_POINTS)
-            if compare_discrete and compare_month_label:
-                compare_month = pd.Timestamp(compare_month_label)
-                compare_curve_df = discrete_result.reconstructed_curve.loc[
-                    discrete_result.reconstructed_curve["DateM"] == compare_month,
-                    ["n", "Tasa_Estimada"],
-                ].set_index("n")
-                compare_observed_df = discrete_result.observed_monthly.loc[
-                    discrete_result.observed_monthly["DateM"] == compare_month,
-                    ["n", "Valor_Tasa"],
-                ].set_index("n")
-                add_discrete_curve(compare_curve_df, compare_observed_df, compare_month_label, BLOOMBERG_FACTOR, "#7ae582")
-            _apply_bloomberg_style(fig_discrete, xaxis_title="Madurez (meses)", yaxis_title="Tasa")
-            fig_discrete.update_layout(height=320)
-            st.plotly_chart(fig_discrete, use_container_width=True)
-            st.dataframe(
-                observed_df.rename(columns={"Valor_Tasa": "Observada"}),
-                use_container_width=True,
+    if len(spline_columns) < 3:
+        st.info("Selecciona al menos 3 tasas para estimar el spline.")
+    else:
+        spline_columns = sorted(spline_columns, key=lambda column: RATE_SERIES[column].months)
+        maturities = np.array([RATE_SERIES[column].months for column in spline_columns], dtype=float)
+        continuous_months = np.arange(int(maturities.min()), int(maturities.max()) + 1, dtype=float)
+        fig_spline = go.Figure()
+        spline_curve_exports = []
+        colors = [
+            (BLOOMBERG_CURVE, BLOOMBERG_POINTS),
+            (BLOOMBERG_FACTOR, BLOOMBERG_COMPARE),
+            ("#ff6b6b", "#c7f464"),
+        ]
+        observed_rates = None
+        for idx, date_str in enumerate(selected_spline_dates):
+            date_value = pd.Timestamp(date_str)
+            source_row = rates_df.loc[rates_df["Date"] == date_value, ["Date", *spline_columns]].iloc[-1]
+            rates = source_row[spline_columns].to_numpy(dtype=float)
+            curve = reconstruct_cubic_spline_curve(maturities, rates, continuous_months)
+            curve_color, point_color = colors[idx]
+            fig_spline.add_trace(_line_trace(continuous_months, curve, f"Interpolada {date_str}", curve_color))
+            fig_spline.add_trace(_marker_trace(maturities, rates, f"Observada {date_str}", point_color))
+            spline_curve_exports.append(
+                pd.DataFrame({"Date": date_str, "MaturityMonths": continuous_months.astype(int), "EstimatedRate": curve})
             )
+            spline_curve_exports.append(
+                pd.DataFrame({"Date": date_str, "MaturityMonths": maturities.astype(int), "ObservedRate": rates})
+            )
+            if idx == 0:
+                observed_rates = rates
 
-        monthly_betas_display = discrete_result.monthly_betas.copy()
-        monthly_betas_display["DateM"] = monthly_betas_display["DateM"].dt.strftime("%Y-%m-%d")
-        st.dataframe(monthly_betas_display, use_container_width=True, hide_index=True)
-        _download_button(discrete_result.monthly_betas, "Descargar betas discretas", "discrete_betas.csv")
-        _download_button(
-            discrete_result.reconstructed_curve,
-            "Descargar curva reconstruida",
-            "discrete_curve.csv",
+        top_col1, top_col2 = st.columns([1, 1])
+        with top_col1:
+            _download_button(pd.concat(spline_curve_exports, ignore_index=True), "Descargar curvas", "cubic_spline_curves.csv")
+
+        _apply_bloomberg_style(fig_spline, xaxis_title="Madurez (meses)", yaxis_title="Tasa")
+        fig_spline.update_layout(height=420)
+        st.plotly_chart(fig_spline, use_container_width=True)
+        st.dataframe(
+            pd.DataFrame({"Madurez (meses)": maturities.astype(int), "Tasa observada": observed_rates}),
+            use_container_width=True,
+            hide_index=True,
         )
 
 template_buffer = io.StringIO()

@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
+from scipy.interpolate import CubicSpline
 
 from .series import DEFAULT_DISCRETE_COLUMNS, DEFAULT_NS_COLUMNS, RATE_MATURITY_MONTHS
 
@@ -13,6 +14,15 @@ class NelsonSiegelResult:
     observed: pd.DataFrame
     fitted: pd.DataFrame
     lambda_value: float
+
+
+@dataclass
+class SvenssonResult:
+    betas: pd.DataFrame
+    observed: pd.DataFrame
+    fitted: pd.DataFrame
+    lambda1_value: float
+    lambda2_value: float
 
 
 @dataclass
@@ -95,6 +105,27 @@ def reconstruct_nelson_siegel_curve(
     return loadings @ beta_vector
 
 
+def svensson_loadings(tau_years: np.ndarray, lambda1_value: float, lambda2_value: float) -> np.ndarray:
+    level = np.ones(len(tau_years))
+    slope = (1.0 - np.exp(-lambda1_value * tau_years)) / (lambda1_value * tau_years)
+    curvature_1 = slope - np.exp(-lambda1_value * tau_years)
+    curvature_2 = ((1.0 - np.exp(-lambda2_value * tau_years)) / (lambda2_value * tau_years)) - np.exp(
+        -lambda2_value * tau_years
+    )
+    return np.column_stack([level, slope, curvature_1, curvature_2])
+
+
+def reconstruct_svensson_curve(
+    tau_years: np.ndarray,
+    betas_row: pd.Series,
+    lambda1_value: float,
+    lambda2_value: float,
+) -> np.ndarray:
+    loadings = svensson_loadings(tau_years, lambda1_value, lambda2_value)
+    beta_vector = betas_row[["level", "slope", "curvature_1", "curvature_2"]].to_numpy(dtype=float)
+    return loadings @ beta_vector
+
+
 def fit_nelson_siegel(
     df: pd.DataFrame,
     columns: list[str] | None = None,
@@ -131,6 +162,56 @@ def fit_nelson_siegel(
         fitted=pd.DataFrame(fitted_rows),
         lambda_value=lambda_value,
     )
+
+
+def fit_svensson(
+    df: pd.DataFrame,
+    columns: list[str] | None = None,
+    lambda1_value: float = 0.0609,
+    lambda2_value: float = 0.20,
+) -> SvenssonResult:
+    columns = columns or DEFAULT_NS_COLUMNS
+    columns = sorted(columns, key=lambda column: RATE_MATURITY_MONTHS[column])
+    observed = df[["Date", *columns]].dropna().copy()
+    if observed.empty:
+        raise ValueError("No hay suficientes datos completos para ajustar Svensson.")
+
+    tau_years = np.array([RATE_MATURITY_MONTHS[column] / 12.0 for column in columns], dtype=float)
+    loadings = svensson_loadings(tau_years, lambda1_value, lambda2_value)
+
+    betas = []
+    fitted_rows = []
+    for _, row in observed.iterrows():
+        rates = row[columns].to_numpy(dtype=float)
+        beta = np.linalg.lstsq(loadings, rates, rcond=None)[0]
+        fitted = loadings @ beta
+        betas.append(
+            {
+                "Date": row["Date"],
+                "level": beta[0],
+                "slope": beta[1],
+                "curvature_1": beta[2],
+                "curvature_2": beta[3],
+            }
+        )
+        fitted_rows.append({"Date": row["Date"], **dict(zip(columns, fitted))})
+
+    return SvenssonResult(
+        betas=pd.DataFrame(betas),
+        observed=observed,
+        fitted=pd.DataFrame(fitted_rows),
+        lambda1_value=lambda1_value,
+        lambda2_value=lambda2_value,
+    )
+
+
+def reconstruct_cubic_spline_curve(
+    observed_maturity_months: np.ndarray,
+    observed_rates: np.ndarray,
+    target_months: np.ndarray,
+) -> np.ndarray:
+    spline = CubicSpline(observed_maturity_months, observed_rates, bc_type="natural")
+    return spline(target_months)
 
 
 def _long_rates(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
