@@ -5,7 +5,7 @@ import pandas as pd
 from dataclasses import dataclass
 from scipy.interpolate import CubicSpline
 
-from .series import DEFAULT_DISCRETE_COLUMNS, DEFAULT_NS_COLUMNS, RATE_MATURITY_MONTHS
+from .series import DEFAULT_DISCRETE_COLUMNS, DEFAULT_NS_COLUMNS, LEGACY_RATE_ALIASES, RATE_MATURITY_MONTHS
 
 
 @dataclass
@@ -36,6 +36,7 @@ class DiscreteNelsonSiegelResult:
 
 def prepare_rates_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     prepared = df.copy()
+    prepared = prepared.rename(columns=LEGACY_RATE_ALIASES)
     if "Date" not in prepared.columns:
         raise ValueError("El archivo debe incluir una columna 'Date'.")
 

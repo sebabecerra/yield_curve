@@ -29,6 +29,14 @@ BLOOMBERG_CURVE = "#f5a623"
 BLOOMBERG_POINTS = "#ffd166"
 BLOOMBERG_FACTOR = "#00c2ff"
 BLOOMBERG_COMPARE = "#7ae582"
+CURVE_COLOR_PAIRS = [
+    (BLOOMBERG_CURVE, BLOOMBERG_POINTS),
+    (BLOOMBERG_FACTOR, BLOOMBERG_COMPARE),
+    ("#ff6b6b", "#c7f464"),
+    ("#c792ea", "#82aaff"),
+    ("#f78c6c", "#89ddff"),
+    ("#addb67", "#f07178"),
+]
 
 
 def _apply_bloomberg_style(fig: go.Figure, xaxis_title: str = "", yaxis_title: str = "") -> None:
@@ -99,9 +107,9 @@ def _curve_date_selection(available_dates: list[str], key_prefix: str) -> list[s
         "Fechas a comparar",
         options=[date for date in available_dates if date != base_date],
         default=[],
-        max_selections=2,
+        max_selections=5,
         key=f"{key_prefix}_compare_dates",
-        help="Puedes seleccionar hasta 2 fechas adicionales. Con la fecha base, el máximo total es 3.",
+        help="Puedes seleccionar hasta 5 fechas adicionales. Con la fecha base, el maximo total es 6.",
     )
     return [base_date, *compare_dates]
 
@@ -115,7 +123,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Sube un CSV", type=["csv"], disabled=source_mode != "CSV")
     st.markdown(
         "Formato esperado: columna `Date` más columnas con alias del catálogo, por ejemplo "
-        "`spc_pesos_2y`, `spc_pesos_3y`, `spc_pesos_4y`, `spc_pesos_5y`, `spc_pesos_10y`."
+        "`SPC_2Y`, `SPC_3Y`, `SPC_4Y`, `SPC_5Y`, `SPC_10Y`."
     )
     st.caption("Series disponibles: " + ", ".join(RATE_SERIES.keys()))
     if source_mode == "BCCh":
@@ -296,11 +304,6 @@ with tab_ns:
         )
         available_dates = ns_result.observed["Date"].dt.strftime("%Y-%m-%d").tolist()
         selected_ns_dates = _curve_date_selection(available_dates, "ns")
-        top_col1, top_col2, top_col3 = st.columns([1, 1, 2])
-        with top_col1:
-            st.metric("Lambda usada", f"{ns_result.lambda_value:.2f}")
-        with top_col2:
-            _download_button(ns_result.betas, "Descargar betas", "nelson_siegel_betas.csv")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("**Factores estimados**")
@@ -365,30 +368,24 @@ with tab_ns:
                     )
                 )
 
-            colors = [
-                (BLOOMBERG_CURVE, BLOOMBERG_POINTS),
-                (BLOOMBERG_FACTOR, BLOOMBERG_COMPARE),
-                ("#ff6b6b", "#c7f464"),
-            ]
             for idx, date_str in enumerate(selected_ns_dates):
                 date_value = pd.Timestamp(date_str)
                 observed_row = ns_result.observed.loc[ns_result.observed["Date"] == date_value].iloc[-1]
                 beta_row = ns_result.betas.loc[ns_result.betas["Date"] == date_value].iloc[-1]
-                curve_color, point_color = colors[idx]
+                curve_color, point_color = CURVE_COLOR_PAIRS[idx]
                 add_ns_curve(observed_row, beta_row, date_str, curve_color, point_color)
             _apply_bloomberg_style(fig_ns, xaxis_title="Madurez (meses)", yaxis_title="Tasa")
             fig_ns.update_layout(height=320)
             st.plotly_chart(fig_ns, use_container_width=True)
-        with top_col3:
+        download_col1, download_col2 = st.columns(2)
+        with download_col1:
+            _download_button(ns_result.betas, "Descargar betas", "nelson_siegel_betas.csv")
+        with download_col2:
             _download_button(
                 pd.concat(ns_curve_exports, ignore_index=True),
                 "Descargar curvas",
                 "nelson_siegel_curves.csv",
             )
-
-        betas_display = ns_result.betas.copy()
-        betas_display["Date"] = betas_display["Date"].dt.strftime("%Y-%m-%d")
-        st.dataframe(betas_display, use_container_width=True, hide_index=True)
 
 with tab_svensson:
     st.subheader("Nelson-Siegel-Svensson")
@@ -410,25 +407,15 @@ with tab_svensson:
         lambda1 = st.number_input("Lambda 1", min_value=0.001, max_value=2.0, value=0.0609, step=0.001, format="%.4f")
         lambda2 = st.number_input("Lambda 2", min_value=0.001, max_value=2.0, value=0.2000, step=0.001, format="%.4f")
         svensson_result = fit_svensson(rates_df, columns=sv_columns, lambda1_value=lambda1, lambda2_value=lambda2)
-        top_col1, top_col2, top_col3 = st.columns([1, 1, 2])
-        with top_col1:
-            st.metric("Lambda 1", f"{svensson_result.lambda1_value:.4f}")
-        with top_col2:
-            st.metric("Lambda 2", f"{svensson_result.lambda2_value:.4f}")
 
         fig_sv = go.Figure()
         sv_curve_exports = []
-        colors = [
-            (BLOOMBERG_CURVE, BLOOMBERG_POINTS),
-            (BLOOMBERG_FACTOR, BLOOMBERG_COMPARE),
-            ("#ff6b6b", "#c7f464"),
-        ]
         for idx, date_str in enumerate(selected_sv_dates):
             date_value = pd.Timestamp(date_str)
             source_row = rates_df.loc[rates_df["Date"] == date_value, ["Date", *sv_columns]].iloc[-1]
             beta_row = svensson_result.betas.loc[svensson_result.betas["Date"] == date_value].iloc[-1]
             curve = reconstruct_svensson_curve(continuous_months / 12.0, beta_row, lambda1, lambda2)
-            curve_color, point_color = colors[idx]
+            curve_color, point_color = CURVE_COLOR_PAIRS[idx]
             fig_sv.add_trace(_line_trace(continuous_months, curve, f"Estimada {date_str}", curve_color))
             fig_sv.add_trace(
                 _marker_trace(maturities, [source_row[column] for column in sv_columns], f"Observada {date_str}", point_color)
@@ -474,13 +461,11 @@ with tab_svensson:
             _apply_bloomberg_style(fig_sv, xaxis_title="Madurez (meses)", yaxis_title="Tasa")
             fig_sv.update_layout(height=320)
             st.plotly_chart(fig_sv, use_container_width=True)
-        with top_col3:
-            download_col1, download_col2 = st.columns(2)
-            with download_col1:
-                _download_button(sv_display, "Descargar betas", "svensson_betas.csv")
-            with download_col2:
-                _download_button(pd.concat(sv_curve_exports, ignore_index=True), "Descargar curvas", "svensson_curves.csv")
-        st.dataframe(sv_display, use_container_width=True, hide_index=True)
+        download_col1, download_col2 = st.columns(2)
+        with download_col1:
+            _download_button(sv_display, "Descargar betas", "svensson_betas.csv")
+        with download_col2:
+            _download_button(pd.concat(sv_curve_exports, ignore_index=True), "Descargar curvas", "svensson_curves.csv")
 
 with tab_spline:
     st.subheader("Cubic spline")
@@ -501,18 +486,13 @@ with tab_spline:
         continuous_months = np.arange(int(maturities.min()), int(maturities.max()) + 1, dtype=float)
         fig_spline = go.Figure()
         spline_curve_exports = []
-        colors = [
-            (BLOOMBERG_CURVE, BLOOMBERG_POINTS),
-            (BLOOMBERG_FACTOR, BLOOMBERG_COMPARE),
-            ("#ff6b6b", "#c7f464"),
-        ]
         observed_rates = None
         for idx, date_str in enumerate(selected_spline_dates):
             date_value = pd.Timestamp(date_str)
             source_row = rates_df.loc[rates_df["Date"] == date_value, ["Date", *spline_columns]].iloc[-1]
             rates = source_row[spline_columns].to_numpy(dtype=float)
             curve = reconstruct_cubic_spline_curve(maturities, rates, continuous_months)
-            curve_color, point_color = colors[idx]
+            curve_color, point_color = CURVE_COLOR_PAIRS[idx]
             fig_spline.add_trace(_line_trace(continuous_months, curve, f"Interpolada {date_str}", curve_color))
             fig_spline.add_trace(_marker_trace(maturities, rates, f"Observada {date_str}", point_color))
             spline_curve_exports.append(
@@ -524,18 +504,10 @@ with tab_spline:
             if idx == 0:
                 observed_rates = rates
 
-        top_col1, top_col2 = st.columns([1, 1])
-        with top_col1:
-            _download_button(pd.concat(spline_curve_exports, ignore_index=True), "Descargar curvas", "cubic_spline_curves.csv")
-
         _apply_bloomberg_style(fig_spline, xaxis_title="Madurez (meses)", yaxis_title="Tasa")
         fig_spline.update_layout(height=420)
         st.plotly_chart(fig_spline, use_container_width=True)
-        st.dataframe(
-            pd.DataFrame({"Madurez (meses)": maturities.astype(int), "Tasa observada": observed_rates}),
-            use_container_width=True,
-            hide_index=True,
-        )
+        _download_button(pd.concat(spline_curve_exports, ignore_index=True), "Descargar curvas", "cubic_spline_curves.csv")
 
 template_buffer = io.StringIO()
 pd.DataFrame(columns=["Date", *DEFAULT_NS_COLUMNS]).to_csv(template_buffer, index=False)

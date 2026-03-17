@@ -14,36 +14,36 @@ class RateSeries:
 
 
 RATE_SERIES = {
-    "spc_pesos_2y": RateSeries(
-        key="spc_pesos_2y",
+    "SPC_2Y": RateSeries(
+        key="SPC_2Y",
         label="SPC en pesos 2 años",
         code="F022.SPC.TIN.AN02.NO.Z.D",
         months=24,
         currency="CLP",
     ),
-    "spc_pesos_3y": RateSeries(
-        key="spc_pesos_3y",
+    "SPC_3Y": RateSeries(
+        key="SPC_3Y",
         label="SPC en pesos 3 años",
         code="F022.SPC.TIN.AN03.NO.Z.D",
         months=36,
         currency="CLP",
     ),
-    "spc_pesos_4y": RateSeries(
-        key="spc_pesos_4y",
+    "SPC_4Y": RateSeries(
+        key="SPC_4Y",
         label="SPC en pesos 4 años",
         code="F022.SPC.TIN.AN04.NO.Z.D",
         months=48,
         currency="CLP",
     ),
-    "spc_pesos_5y": RateSeries(
-        key="spc_pesos_5y",
+    "SPC_5Y": RateSeries(
+        key="SPC_5Y",
         label="SPC en pesos 5 años",
         code="F022.SPC.TIN.AN05.NO.Z.D",
         months=60,
         currency="CLP",
     ),
-    "spc_pesos_10y": RateSeries(
-        key="spc_pesos_10y",
+    "SPC_10Y": RateSeries(
+        key="SPC_10Y",
         label="SPC en pesos 10 años",
         code="F022.SPC.TIN.AN10.NO.Z.D",
         months=120,
@@ -104,11 +104,19 @@ RATE_SERIES = {
 RATE_MATURITY_MONTHS = {series.key: series.months for series in RATE_SERIES.values()}
 
 DEFAULT_NS_COLUMNS = [
-    "spc_pesos_2y",
-    "spc_pesos_3y",
-    "spc_pesos_4y",
-    "spc_pesos_5y",
-    "spc_pesos_10y",
+    "SPC_2Y",
+    "SPC_3Y",
+    "SPC_4Y",
+    "SPC_5Y",
+    "SPC_10Y",
 ]
 
 DEFAULT_DISCRETE_COLUMNS = DEFAULT_NS_COLUMNS.copy()
+
+LEGACY_RATE_ALIASES = {
+    "spc_pesos_2y": "SPC_2Y",
+    "spc_pesos_3y": "SPC_3Y",
+    "spc_pesos_4y": "SPC_4Y",
+    "spc_pesos_5y": "SPC_5Y",
+    "spc_pesos_10y": "SPC_10Y",
+}
