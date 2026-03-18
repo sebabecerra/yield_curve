@@ -839,6 +839,28 @@
       return `${API_BASE}${path}`;
     }
 
+    async function readApiResponse(response, fallbackMessage) {
+      const rawText = await response.text();
+      let payload = null;
+      if (rawText) {
+        try {
+          payload = JSON.parse(rawText);
+        } catch {
+          if (!response.ok) {
+            if (/<!doctype html>|<html/i.test(rawText)) {
+              throw new Error("El backend devolvio HTML en vez de JSON. Revisa el deploy de Render.");
+            }
+            throw new Error(rawText.trim() || fallbackMessage);
+          }
+          throw new Error(fallbackMessage);
+        }
+      }
+      if (!response.ok) {
+        throw new Error(payload?.detail || fallbackMessage);
+      }
+      return payload;
+    }
+
     function setLoggedIn(loggedIn) {
       authScreen.classList.toggle("hidden", loggedIn);
       workspaceHero.classList.toggle("hidden", !loggedIn);
@@ -1208,10 +1230,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.detail || "No se pudo cargar la base.");
-        }
+        const data = await readApiResponse(response, "No se pudo cargar la base.");
 
         currentData = data;
         currentSampleRows = data.meta.sample_rows || [];
@@ -1270,10 +1289,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.detail || "No se pudo calcular.");
-        }
+        const data = await readApiResponse(response, "No se pudo calcular.");
 
         currentCalculations[modelName] = data;
         updateModelMeta(modelName, data.meta.rows_used, data.meta.columns);
@@ -1309,10 +1325,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.detail || "No se pudo graficar.");
-        }
+        const data = await readApiResponse(response, "No se pudo graficar.");
 
         const ui = modelUI(modelName);
         Plotly.newPlot(ui.curveChart, curveTraces(data.curves), {
