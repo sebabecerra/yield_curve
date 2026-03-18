@@ -120,7 +120,7 @@
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      margin-top: 26px;
+      margin-top: 52px;
       justify-content: center;
     }
     .auth-status {
@@ -346,7 +346,7 @@
       margin-bottom: 10px;
     }
     .compare-picker select {
-      flex: 1 1 260px;
+      flex: 1 1 180px;
       background: #0a1118;
       color: var(--text);
       border: 1px solid var(--line);
@@ -628,7 +628,9 @@
             <div class="field">
               <label>Fechas a comparar</label>
               <div class="compare-picker">
-                <select id="nsComparePicker"></select>
+                <select id="nsCompareYear"></select>
+                <select id="nsCompareMonth"></select>
+                <select id="nsCompareDay"></select>
               </div>
               <div id="nsCompareDates" class="chip-grid model-chips"></div>
             </div>
@@ -681,7 +683,9 @@
             <div class="field">
               <label>Fechas a comparar</label>
               <div class="compare-picker">
-                <select id="svComparePicker"></select>
+                <select id="svCompareYear"></select>
+                <select id="svCompareMonth"></select>
+                <select id="svCompareDay"></select>
               </div>
               <div id="svCompareDates" class="chip-grid model-chips"></div>
             </div>
@@ -726,7 +730,9 @@
             <div class="field">
               <label>Fechas a comparar</label>
               <div class="compare-picker">
-                <select id="splineComparePicker"></select>
+                <select id="splineCompareYear"></select>
+                <select id="splineCompareMonth"></select>
+                <select id="splineCompareDay"></select>
               </div>
               <div id="splineCompareDates" class="chip-grid model-chips"></div>
             </div>
@@ -777,7 +783,9 @@
       "nelson-siegel": {
         columnsSelect: "nsColumns",
         baseDate: "nsBaseDate",
-        comparePicker: "nsComparePicker",
+        compareYear: "nsCompareYear",
+        compareMonth: "nsCompareMonth",
+        compareDay: "nsCompareDay",
         compareDates: "nsCompareDates",
         runBtn: "nsRunBtn",
         curveChart: "curveChart",
@@ -792,7 +800,9 @@
       "svensson": {
         columnsSelect: "svColumns",
         baseDate: "svBaseDate",
-        comparePicker: "svComparePicker",
+        compareYear: "svCompareYear",
+        compareMonth: "svCompareMonth",
+        compareDay: "svCompareDay",
         compareDates: "svCompareDates",
         runBtn: "svRunBtn",
         curveChart: "curveChartSv",
@@ -808,7 +818,9 @@
       "cubic-spline": {
         columnsSelect: "splineColumns",
         baseDate: "splineBaseDate",
-        comparePicker: "splineComparePicker",
+        compareYear: "splineCompareYear",
+        compareMonth: "splineCompareMonth",
+        compareDay: "splineCompareDay",
         compareDates: "splineCompareDates",
         runBtn: "splineRunBtn",
         curveChart: "curveChartSpline",
@@ -830,7 +842,9 @@
       Object.values(modelConfigs).forEach(config => {
         document.getElementById(config.runBtn).disabled = !enabled;
         document.getElementById(config.baseDate).disabled = !enabled;
-        document.getElementById(config.comparePicker).disabled = !enabled;
+        document.getElementById(config.compareYear).disabled = !enabled;
+        document.getElementById(config.compareMonth).disabled = !enabled;
+        document.getElementById(config.compareDay).disabled = !enabled;
         document.getElementById(config.compareDates).style.pointerEvents = enabled ? "auto" : "none";
         document.getElementById(config.compareDates).style.opacity = enabled ? "1" : "0.55";
         document.getElementById(config.columnsSelect).style.pointerEvents = enabled ? "auto" : "none";
@@ -1012,17 +1026,15 @@
     function populateDateSelectors(dates) {
       Object.values(modelConfigs).forEach(config => {
         const baseDate = document.getElementById(config.baseDate);
-        const comparePicker = document.getElementById(config.comparePicker);
+        const compareYear = document.getElementById(config.compareYear);
+        const compareMonth = document.getElementById(config.compareMonth);
+        const compareDay = document.getElementById(config.compareDay);
         const compareDates = document.getElementById(config.compareDates);
         baseDate.innerHTML = "";
-        comparePicker.innerHTML = "";
+        compareYear.innerHTML = "";
+        compareMonth.innerHTML = "";
+        compareDay.innerHTML = "";
         compareDates.innerHTML = "";
-
-        const placeholder = document.createElement("option");
-        placeholder.value = "";
-        placeholder.textContent = "Ingrese fecha para comparar";
-        placeholder.selected = true;
-        comparePicker.appendChild(placeholder);
 
         dates.forEach((date, index) => {
           const option = document.createElement("option");
@@ -1032,16 +1044,67 @@
           baseDate.appendChild(option);
         });
 
-        dates.forEach((date, index) => {
-          if (index === dates.length - 1) {
-            return;
-          }
-          const option = document.createElement("option");
-          option.value = date;
-          option.textContent = date;
-          comparePicker.appendChild(option);
-        });
+        initializeCompareSelectors(config, dates);
       });
+    }
+
+    function fillSelect(selectElement, placeholderText, values, formatter = value => value) {
+      selectElement.innerHTML = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = placeholderText;
+      placeholder.selected = true;
+      selectElement.appendChild(placeholder);
+      values.forEach(value => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = formatter(value);
+        selectElement.appendChild(option);
+      });
+    }
+
+    function initializeCompareSelectors(config, dates) {
+      const compareYear = document.getElementById(config.compareYear);
+      const compareMonth = document.getElementById(config.compareMonth);
+      const compareDay = document.getElementById(config.compareDay);
+      const years = [...new Set(dates.map(date => date.slice(0, 4)))];
+      fillSelect(compareYear, "Año", years);
+      fillSelect(compareMonth, "Mes", []);
+      fillSelect(compareDay, "Día", []);
+    }
+
+    function updateCompareMonthOptions(config, dates) {
+      const compareYear = document.getElementById(config.compareYear).value;
+      const compareMonth = document.getElementById(config.compareMonth);
+      const compareDay = document.getElementById(config.compareDay);
+      if (!compareYear) {
+        fillSelect(compareMonth, "Mes", []);
+        fillSelect(compareDay, "Día", []);
+        return;
+      }
+
+      const months = [...new Set(
+        dates
+          .filter(date => date.startsWith(compareYear + "-"))
+          .map(date => date.slice(5, 7))
+      )];
+      fillSelect(compareMonth, "Mes", months);
+      fillSelect(compareDay, "Día", []);
+    }
+
+    function updateCompareDayOptions(config, dates) {
+      const compareYear = document.getElementById(config.compareYear).value;
+      const compareMonth = document.getElementById(config.compareMonth).value;
+      const compareDay = document.getElementById(config.compareDay);
+      if (!compareYear || !compareMonth) {
+        fillSelect(compareDay, "Día", []);
+        return;
+      }
+
+      const days = dates
+        .filter(date => date.startsWith(`${compareYear}-${compareMonth}-`))
+        .map(date => date.slice(8, 10));
+      fillSelect(compareDay, "Día", days);
     }
 
     function addCompareDateChip(containerId, date, modelName) {
@@ -1347,19 +1410,24 @@
       });
     }
 
-    setLoggedIn(false);
-    setControlsEnabled(false);
-    activatePanel("modelo");
-    document.getElementById("loginBtn").addEventListener("click", loginAndLoadData);
-    document.getElementById("dataSortColumn").addEventListener("change", updateDataTable);
-    document.getElementById("dataSortDirection").addEventListener("change", updateDataTable);
-    document.getElementById("dataRowLimit").addEventListener("change", updateDataTable);
     Object.entries(modelConfigs).forEach(([modelName, config]) => {
-      document.getElementById(config.comparePicker).addEventListener("change", () => {
-        const picker = document.getElementById(config.comparePicker);
-        if (picker.value) {
-          addCompareDateChip(config.compareDates, picker.value, modelName);
-          picker.value = "";
+      document.getElementById(config.compareYear).addEventListener("change", () => {
+        const calculation = currentCalculations[modelName];
+        const dates = calculation?.meta?.available_dates || currentData?.meta?.available_dates || [];
+        updateCompareMonthOptions(config, dates);
+      });
+      document.getElementById(config.compareMonth).addEventListener("change", () => {
+        const calculation = currentCalculations[modelName];
+        const dates = calculation?.meta?.available_dates || currentData?.meta?.available_dates || [];
+        updateCompareDayOptions(config, dates);
+      });
+      document.getElementById(config.compareDay).addEventListener("change", () => {
+        const compareYear = document.getElementById(config.compareYear).value;
+        const compareMonth = document.getElementById(config.compareMonth).value;
+        const compareDay = document.getElementById(config.compareDay).value;
+        if (compareYear && compareMonth && compareDay) {
+          addCompareDateChip(config.compareDates, `${compareYear}-${compareMonth}-${compareDay}`, modelName);
+          document.getElementById(config.compareDay).value = "";
         }
       });
       document.getElementById(config.baseDate).addEventListener("change", () => {
@@ -1368,6 +1436,13 @@
         }
       });
     });
+    setLoggedIn(false);
+    setControlsEnabled(false);
+    activatePanel("modelo");
+    document.getElementById("loginBtn").addEventListener("click", loginAndLoadData);
+    document.getElementById("dataSortColumn").addEventListener("change", updateDataTable);
+    document.getElementById("dataSortDirection").addEventListener("change", updateDataTable);
+    document.getElementById("dataRowLimit").addEventListener("change", updateDataTable);
     document.getElementById("nsRunBtn").addEventListener("click", () => runModel("nelson-siegel"));
     document.getElementById("svRunBtn").addEventListener("click", () => runModel("svensson"));
     document.getElementById("splineRunBtn").addEventListener("click", () => runModel("cubic-spline"));

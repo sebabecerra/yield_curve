@@ -3,217 +3,205 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Yield Curve Lab</title>
+  <title>Yield Curve Web</title>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="./config.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #071019;
-      --bg-2: #0b131c;
-      --panel: rgba(17, 27, 38, 0.92);
-      --panel-2: rgba(13, 22, 31, 0.96);
-      --line: #213346;
-      --text: #dde7f1;
-      --muted: #8aa1b6;
+      --bg: #0b0f14;
+      --panel: rgba(13, 18, 24, 0.96);
+      --panel-2: rgba(10, 14, 19, 0.99);
+      --line: #2a3441;
+      --text: #d7dde5;
+      --muted: #9aa7b5;
       --accent: #f5a623;
-      --accent-2: #37c7ff;
-      --accent-3: #7ee787;
-      --danger: #ff7b72;
-      --shadow: 0 30px 90px rgba(0, 0, 0, 0.35);
-      --radius: 22px;
+      --accent-2: #35c2ff;
+      --accent-3: #7ae582;
+      --shadow: 0 28px 90px rgba(0, 0, 0, 0.38);
     }
-
     * { box-sizing: border-box; }
-
     html, body {
       margin: 0;
-      min-height: 100%;
       background:
-        radial-gradient(circle at 100% 0%, rgba(55, 199, 255, 0.12), transparent 26%),
-        radial-gradient(circle at 0% 100%, rgba(245, 166, 35, 0.14), transparent 24%),
-        linear-gradient(180deg, var(--bg) 0%, #09111a 100%);
+        radial-gradient(circle at 100% 0%, rgba(53,194,255,.06), transparent 24%),
+        radial-gradient(circle at 0% 100%, rgba(245,166,35,.05), transparent 22%),
+        linear-gradient(180deg, #0b0f14 0%, #0a0e13 100%);
       color: var(--text);
       font-family: "Space Grotesk", sans-serif;
+      font-size: 17px;
     }
-
     .shell {
-      max-width: 1540px;
+      max-width: 1760px;
       margin: 0 auto;
-      padding: 26px;
+      padding: 16px 18px 24px;
     }
-
+    .hidden {
+      display: none !important;
+    }
     .hero {
-      display: grid;
-      grid-template-columns: 1.3fr 0.7fr;
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-
-    .card {
       background: linear-gradient(180deg, var(--panel), var(--panel-2));
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      padding: 22px 24px;
+      margin-bottom: 14px;
     }
-
-    .hero-main {
-      padding: 28px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-main::after {
-      content: "";
-      position: absolute;
-      right: -70px;
-      bottom: -80px;
-      width: 260px;
-      height: 260px;
-      border-radius: 999px;
-      background: radial-gradient(circle, rgba(245, 166, 35, 0.24), transparent 70%);
-      pointer-events: none;
-    }
-
     .eyebrow {
       color: var(--accent);
       text-transform: uppercase;
-      letter-spacing: 0.18em;
+      letter-spacing: .18em;
       font-size: 12px;
       font-weight: 700;
-      margin-bottom: 12px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(34px, 5vw, 64px);
-      line-height: 0.96;
-      letter-spacing: -0.05em;
-      max-width: 820px;
-    }
-
-    .hero-copy {
-      margin-top: 16px;
-      color: var(--muted);
-      max-width: 760px;
-      line-height: 1.65;
-      font-size: 16px;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      overflow: hidden;
-    }
-
-    .stat {
-      padding: 22px;
-      border-right: 1px solid rgba(255, 255, 255, 0.05);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      min-height: 122px;
-    }
-
-    .stat:nth-child(2n) { border-right: 0; }
-    .stat:nth-last-child(-n + 2) { border-bottom: 0; }
-
-    .stat-label {
-      color: var(--muted);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
       margin-bottom: 10px;
     }
-
-    .stat-value {
-      font-size: 30px;
-      line-height: 1;
-      font-weight: 700;
-      letter-spacing: -0.05em;
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 60px);
+      line-height: .95;
+      letter-spacing: -.04em;
     }
-
+    .hero-copy {
+      margin-top: 14px;
+      color: var(--muted);
+      max-width: 900px;
+      line-height: 1.6;
+    }
     .layout {
+      display: block;
+    }
+    .auth-shell {
+      min-height: calc(100vh - 52px);
       display: grid;
-      grid-template-columns: 340px 1fr;
-      gap: 18px;
+      place-items: center;
     }
-
-    .sidebar {
-      padding: 18px;
-      position: sticky;
-      top: 18px;
-      align-self: start;
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
     }
-
-    .section-title {
-      margin: 0 0 14px;
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
+    .auth-card {
+      width: min(960px, 100%);
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      overflow: hidden;
+    }
+    .auth-hero {
+      padding: 34px;
+      border-right: 1px solid rgba(255,255,255,.06);
+      background:
+        radial-gradient(circle at top right, rgba(53,194,255,.10), transparent 34%),
+        linear-gradient(180deg, rgba(15, 20, 27, 0.99), rgba(10, 14, 19, 0.99));
+    }
+    .auth-copy {
+      margin-top: 16px;
+      max-width: 420px;
+      line-height: 1.7;
       color: var(--muted);
     }
-
+    .auth-list {
+      margin: 22px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 12px;
+      color: var(--text);
+    }
+    .auth-list li {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.05);
+    }
+    .auth-form {
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .auth-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 52px;
+      justify-content: center;
+    }
+    .auth-status {
+      margin-top: 14px;
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+    .main {
+      padding: 14px 18px 22px;
+    }
+    .section-title {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
     .field {
       margin-bottom: 14px;
     }
-
     .field label {
       display: block;
-      margin-bottom: 8px;
+      font-size: 14px;
       color: var(--muted);
-      font-size: 13px;
+      margin-bottom: 8px;
     }
-
-    .field input,
-    .field select {
+    .field input, .field select {
       width: 100%;
-      background: #0b141d;
-      border: 1px solid var(--line);
+      background: #0a1118;
       color: var(--text);
+      border: 1px solid var(--line);
       border-radius: 12px;
       padding: 12px 14px;
       font: inherit;
-      outline: 0;
+      outline: none;
     }
-
-    .field input:focus,
-    .field select:focus {
-      border-color: rgba(55, 199, 255, 0.55);
-      box-shadow: 0 0 0 4px rgba(55, 199, 255, 0.12);
+    .field input:focus, .field select:focus {
+      border-color: rgba(53,194,255,.55);
+      box-shadow: 0 0 0 4px rgba(53,194,255,.12);
     }
-
-    .chips {
+    .chip-grid {
       display: flex;
-      gap: 8px;
       flex-wrap: wrap;
+      gap: 8px;
     }
-
+    .chip-grid.model-chips {
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      background: #0a1118;
+      min-height: 56px;
+    }
     .chip {
       padding: 8px 12px;
       border-radius: 999px;
-      font-size: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.03);
       color: var(--text);
-      background: rgba(255, 255, 255, 0.03);
+      font-size: 12px;
       cursor: pointer;
       user-select: none;
-      transition: 0.18s ease;
     }
-
     .chip.active {
-      background: rgba(245, 166, 35, 0.12);
+      background: rgba(245,166,35,.12);
       color: #ffd57a;
-      border-color: rgba(245, 166, 35, 0.35);
+      border-color: rgba(245,166,35,.35);
     }
-
     .btn-row {
       display: flex;
       gap: 10px;
-      margin-top: 18px;
       flex-wrap: wrap;
+      margin-top: 18px;
     }
-
     .btn {
       border: 0;
       border-radius: 999px;
@@ -221,351 +209,1211 @@
       font: inherit;
       font-weight: 700;
       cursor: pointer;
-      transition: 0.18s ease;
     }
-
-    .btn:hover { transform: translateY(-1px); }
-
     .btn-primary {
-      background: linear-gradient(135deg, var(--accent), #ffca65);
-      color: #141414;
+      background: linear-gradient(135deg, var(--accent), #ffcb66);
+      color: #111;
     }
-
     .btn-ghost {
-      background: rgba(255, 255, 255, 0.04);
+      background: rgba(255,255,255,.04);
       color: var(--text);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255,255,255,.08);
     }
-
-    .main {
-      padding: 18px;
-    }
-
     .tabs {
       display: flex;
-      gap: 10px;
+      gap: 22px;
       flex-wrap: wrap;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
     }
-
     .tab {
-      padding: 10px 14px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.03);
+      padding: 6px 0 10px;
+      border-radius: 0;
+      border: 0;
       color: var(--muted);
       cursor: pointer;
-      font-size: 13px;
       font-weight: 700;
+      font-size: 15px;
+      position: relative;
     }
-
     .tab.active {
       color: var(--text);
-      background: rgba(55, 199, 255, 0.10);
-      border-color: rgba(55, 199, 255, 0.35);
+      background: transparent;
     }
-
-    .toolbar {
+    .tab.active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -11px;
+      height: 2px;
+      background: #ff5c5c;
+      border-radius: 999px;
+    }
+    .tabpanel {
+      display: none;
+    }
+    .tabpanel.active {
+      display: block;
+    }
+    .copy-block {
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 22px;
+      max-width: 980px;
+    }
+    .copy-block h2 {
+      margin: 0 0 14px;
+      color: var(--text);
+      font-size: 30px;
+      letter-spacing: -.03em;
+    }
+    .copy-block h3 {
+      margin: 28px 0 12px;
+      color: var(--text);
+      font-size: 18px;
+      letter-spacing: -.02em;
+    }
+    .copy-block p,
+    .copy-block ul {
+      margin: 0 0 12px;
+    }
+    .copy-block ul {
+      padding-left: 18px;
+    }
+    .copy-block code {
+      padding: 2px 6px;
+      border-radius: 8px;
+      background: rgba(53,194,255,.09);
+      border: 1px solid rgba(53,194,255,.15);
+      color: #8ce7ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+    }
+    .copy-block .model-label {
+      display: inline-block;
+      margin: 8px 0 4px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: rgba(245,166,35,.1);
+      border: 1px solid rgba(245,166,35,.16);
+      color: #ffd57a;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 16px;
+      background: #0a0f14;
+    }
+    .data-toolbar {
       display: flex;
+      gap: 12px;
       justify-content: space-between;
       align-items: center;
-      gap: 12px;
       flex-wrap: wrap;
       margin-bottom: 14px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
-
-    .toolbar-left,
-    .toolbar-right {
+    .data-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .mini-field {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .mini-field select {
+      min-width: 140px;
+      background: #0a1118;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+    .compare-picker {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .compare-picker select {
+      flex: 1 1 180px;
+      background: #0a1118;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      outline: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      background: #11161d;
+    }
+    .data-summary {
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .model-heading {
+      margin: 0 0 12px;
+      color: var(--text);
+      font-size: 22px;
+      letter-spacing: -.02em;
+    }
+    .model-form {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .model-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 10px;
+    }
+    .chart-card-title {
+      margin: 0 0 10px;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .download-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 14px;
+    }
+    .download-row.single {
+      grid-template-columns: 1fr;
+    }
+    .hidden-download {
+      visibility: hidden;
+    }
+    .badges {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
-      align-items: center;
     }
-
     .badge {
       font-family: "IBM Plex Mono", monospace;
       font-size: 12px;
       color: var(--muted);
       padding: 8px 10px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
     }
-
     .chart {
       width: 100%;
-      height: 600px;
-      border-radius: 16px;
+      height: 540px;
+      border-radius: 14px;
       overflow: hidden;
-      background: #0a1219;
+      background: #11161d;
     }
-
-    .note {
+    .chart + .chart {
+      margin-top: 16px;
+    }
+    .status {
       margin-top: 14px;
-      color: var(--muted);
       font-size: 13px;
-      line-height: 1.6;
+      color: var(--muted);
+      min-height: 20px;
     }
-
-    @media (max-width: 1100px) {
-      .hero { grid-template-columns: 1fr; }
-      .layout { grid-template-columns: 1fr; }
-      .sidebar { position: static; }
-      .chart { height: 470px; }
+    @media (max-width: 1080px) {
+      .auth-card { grid-template-columns: 1fr; }
+      .auth-hero { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+      .model-grid, .download-row { grid-template-columns: 1fr; }
+      .chart { height: 430px; }
     }
   </style>
 </head>
 <body>
   <div class="shell">
-    <section class="hero">
-      <div class="card hero-main">
-        <div class="eyebrow">Yield Curve Platform</div>
-        <h1>Una web pública<br>para curvas de tasas</h1>
-        <div class="hero-copy">
-          Esta versión HTML está pensada como una capa visual más seria: selección de fuente, fechas, modelos, curvas comparadas y una experiencia más natural para usuarios no técnicos. Es la base correcta para evolucionar desde Streamlit hacia una página web pública.
+    <section class="auth-shell" id="authScreen">
+      <div class="card auth-card">
+        <div class="auth-hero">
+          <div class="eyebrow">Yield Curve Web</div>
+          <h1>Primero entra al BCCh</h1>
+          <div class="auth-copy">
+            Esta pantalla abre la sesion y carga la base completa hasta la ultima fecha disponible. Despues se habilita el workspace para calcular y comparar curvas.
+          </div>
+          <ul class="auth-list">
+            <li>1. Ingresas tus credenciales BCCh.</li>
+            <li>2. La app descarga y limpia la base completa.</li>
+            <li>3. Recien despues eliges modelo, fechas y graficos.</li>
+          </ul>
         </div>
-      </div>
-      <div class="card stats">
-        <div class="stat">
-          <div class="stat-label">Fuente</div>
-          <div class="stat-value">BCCh / CSV</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Curvas</div>
-          <div class="stat-value">Hasta 6</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Modelos</div>
-          <div class="stat-value">3</div>
-        </div>
-        <div class="stat">
-          <div class="stat-label">Salida</div>
-          <div class="stat-value">Web pública</div>
+        <div class="auth-form">
+          <h3 class="section-title">Credenciales</h3>
+          <div class="field">
+            <label>Usuario BCCh</label>
+            <input id="user" type="text" placeholder="usuario@correo.cl" />
+          </div>
+          <div class="field">
+            <label>Contrasena BCCh</label>
+            <input id="password" type="password" placeholder="••••••••" />
+          </div>
+          <div class="auth-actions">
+            <button class="btn btn-primary" id="loginBtn">Entrar</button>
+          </div>
+          <div class="auth-status" id="authStatus"></div>
         </div>
       </div>
     </section>
 
-    <section class="layout">
-      <aside class="card sidebar">
-        <h3 class="section-title">Fuente de Datos</h3>
+    <section class="hero hidden" id="workspaceHero">
+      <div class="eyebrow">Yield Curve Web</div>
+      <h1>Workspace de curvas</h1>
+      <div class="hero-copy">
+        La base ya esta cargada. Ahora puedes elegir modelo, ajustar parametros y graficar varias fechas sin volver a autenticarte.
+      </div>
+    </section>
 
-        <div class="field">
-          <label>Modo</label>
-          <select>
-            <option>BCCh</option>
-            <option>CSV</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Usuario BCCh</label>
-          <input type="text" placeholder="usuario@correo.cl" />
-        </div>
-
-        <div class="field">
-          <label>Contraseña BCCh</label>
-          <input type="password" placeholder="••••••••••••" />
-        </div>
-
-        <div class="field">
-          <label>Desde</label>
-          <input type="date" value="2020-01-01" />
-        </div>
-
-        <div class="field">
-          <label>Hasta</label>
-          <input type="date" value="2024-12-31" />
-        </div>
-
-        <h3 class="section-title" style="margin-top: 20px;">Nodos de la Curva</h3>
-        <div class="chips" id="seriesChips"></div>
-
-        <h3 class="section-title" style="margin-top: 20px;">Comparación</h3>
-
-        <div class="field">
-          <label>Fecha base</label>
-          <input type="date" value="2024-12-31" />
-        </div>
-
-        <div class="field">
-          <label>Fechas comparadas</label>
-          <select multiple size="6">
-            <option>2024-09-30</option>
-            <option>2024-06-30</option>
-            <option>2024-03-31</option>
-            <option>2023-12-31</option>
-            <option>2023-06-30</option>
-            <option>2022-12-31</option>
-          </select>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-primary">Entrar</button>
-          <button class="btn btn-ghost">Recargar</button>
-        </div>
-      </aside>
-
+    <section class="layout hidden" id="workspaceLayout">
       <main class="card main">
         <div class="tabs">
-          <div class="tab active" data-model="ns">Nelson-Siegel</div>
-          <div class="tab" data-model="sv">Svensson</div>
-          <div class="tab" data-model="cs">Cubic Spline</div>
+          <div class="tab active" data-panel="modelo">Modelo</div>
+          <div class="tab" data-panel="datos">Datos</div>
+          <div class="tab" data-panel="nelson-siegel">Nelson-Siegel</div>
+          <div class="tab" data-panel="svensson">Svensson</div>
+          <div class="tab" data-panel="cubic-spline">Cubic spline</div>
         </div>
 
-        <div class="toolbar">
-          <div class="toolbar-left">
-            <div class="badge">Fuente: BCCh</div>
-            <div class="badge" id="modelBadge">Modelo: Nelson-Siegel</div>
-            <div class="badge">Fechas: 3</div>
-          </div>
-          <div class="toolbar-right">
-            <button class="btn btn-ghost">Descargar curvas</button>
-            <button class="btn btn-ghost">Descargar betas</button>
+        <div class="tabpanel active" id="panel-modelo">
+          <div class="copy-block">
+            <h3>Qué hace la app</h3>
+            <p>Esta app estima una curva de tasas a partir de observaciones efectivas de mercado.</p>
+            <p>Usa varios enfoques:</p>
+            <ul>
+              <li><code>Nelson-Siegel clásico</code>: ajusta factores <code>level</code>, <code>slope</code> y <code>curvature</code> por fecha.</li>
+              <li><code>Nelson-Siegel-Svensson</code>: extiende Nelson-Siegel con un segundo factor de curvatura.</li>
+              <li><code>Cubic spline</code>: interpola una curva suave directamente sobre los nodos observados.</li>
+            </ul>
+
+            <h3>Cómo entran los datos</h3>
+            <p>La app trabaja solo con datos efectivos.</p>
+            <ul>
+              <li><code>BCCh</code>: descarga series desde el servicio <code>SieteRestWS</code> usando tus credenciales.</li>
+              <li><code>CSV</code>: en la versión Streamlit permite cargar un archivo local con columna <code>Date</code> y columnas de tasas.</li>
+            </ul>
+            <p>En esta web, la base se carga primero desde BCCh y luego se usa el dataset limpio para todos los calculos.</p>
+
+            <h3>Limpieza de datos</h3>
+            <p>Antes de estimar, la app:</p>
+            <ul>
+              <li>convierte <code>Date</code> a fecha</li>
+              <li>convierte las columnas de tasas a numericas</li>
+              <li>elimina cualquier fila que tenga <code>NA</code> en alguna tasa seleccionada</li>
+            </ul>
+            <p>Las curvas se calculan sobre el dataset limpio que ves en la pestana <code>Datos</code>.</p>
+
+            <h3>Cómo se calcula cada modelo</h3>
+            <div class="model-label">Nelson-Siegel</div>
+            <ul>
+              <li>toma una seccion transversal de tasas por fecha</li>
+              <li>construye las cargas de <code>level</code>, <code>slope</code> y <code>curvature</code></li>
+              <li>usa <code>lambda = 0.0609</code> fijo, siguiendo el notebook original</li>
+              <li>estima los betas por minimos cuadrados</li>
+              <li>reconstruye una curva continua sobre la duracion</li>
+            </ul>
+
+            <div class="model-label">Svensson</div>
+            <ul>
+              <li>agrega un cuarto factor de curvatura</li>
+              <li>usa dos parametros <code>lambda</code></li>
+              <li>estima betas por minimos cuadrados</li>
+            </ul>
+
+            <div class="model-label">Cubic spline</div>
+            <ul>
+              <li>toma solo las tasas observadas disponibles</li>
+              <li>ajusta una interpolacion cubica natural</li>
+              <li>produce una curva suave sin factores latentes</li>
+            </ul>
+
+            <h3>Cómo leer los gráficos</h3>
+            <ul>
+              <li><code>Tasas observadas</code>: puntos efectivos disponibles en la fecha elegida.</li>
+              <li><code>Curva estimada</code>: linea ajustada por el modelo.</li>
+              <li><code>Factores</code>: evolucion temporal de los parametros estimados.</li>
+            </ul>
           </div>
         </div>
 
-        <div id="curveChart" class="chart"></div>
+        <div class="tabpanel" id="panel-datos">
+          <h2 style="margin: 0 0 14px; font-size: 26px; letter-spacing: -.03em;">Datos limpios usados en la estimación</h2>
+          <div class="data-summary" id="dataSummary">Base no cargada.</div>
+          <div class="data-toolbar">
+            <div class="data-controls">
+              <label class="mini-field">
+                Ordenar por
+                <select id="dataSortColumn"></select>
+              </label>
+              <label class="mini-field">
+                Orden
+                <select id="dataSortDirection">
+                  <option value="desc">Descendente</option>
+                  <option value="asc">Ascendente</option>
+                </select>
+              </label>
+              <label class="mini-field">
+                Filas
+                <select id="dataRowLimit">
+                  <option value="10" selected>10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </label>
+            </div>
+            <a class="btn btn-ghost hidden" id="downloadCleanDataBtn" href="#" download="rates_input_clean.csv">Descargar datos limpios</a>
+          </div>
+          <div class="table-wrap">
+            <table id="dataTable">
+              <thead id="dataTableHead"></thead>
+              <tbody id="dataTableBody"></tbody>
+            </table>
+          </div>
+        </div>
 
-        <div class="note">
-          Esto es una capa visual estática dentro de `html/`. El siguiente paso natural sería conectarla a la lógica Python actual vía `FastAPI`, manteniendo los modelos y cálculos ya implementados en el proyecto.
+        <div class="tabpanel" id="panel-nelson-siegel">
+          <h2 class="model-heading">Ajuste Nelson-Siegel clásico</h2>
+          <div class="model-form">
+            <div class="field">
+              <label>Columnas para ajuste</label>
+              <div id="nsColumns" class="chip-grid model-chips"></div>
+            </div>
+            <div class="field">
+              <label>Lambda</label>
+              <input id="nsLambda" type="number" step="0.0001" value="0.0609" />
+            </div>
+            <div class="field">
+              <label>Fecha base</label>
+              <select id="nsBaseDate"></select>
+            </div>
+            <div class="field">
+              <label>Fechas a comparar</label>
+              <div class="compare-picker">
+                <select id="nsCompareYear"></select>
+                <select id="nsCompareMonth"></select>
+                <select id="nsCompareDay"></select>
+              </div>
+              <div id="nsCompareDates" class="chip-grid model-chips"></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="nsRunBtn" disabled>Actualizar Nelson-Siegel</button>
+            </div>
+          </div>
+          <div class="toolbar">
+            <div class="badges">
+              <div class="badge" id="metaRows">Filas: -</div>
+              <div class="badge" id="metaCols">Series: -</div>
+            </div>
+          </div>
+          <div class="model-grid">
+            <div>
+              <div class="chart-card-title">Factores estimados</div>
+              <div id="factorChart" class="chart"></div>
+            </div>
+            <div>
+              <div class="chart-card-title">Curvas Nelson-Siegel</div>
+              <div id="curveChart" class="chart"></div>
+            </div>
+          </div>
+          <div class="download-row">
+            <a class="btn btn-ghost hidden-download" id="nsBetasDownload" href="#" download="nelson_siegel_betas.csv">Descargar betas</a>
+            <a class="btn btn-ghost hidden-download" id="nsCurvesDownload" href="#" download="nelson_siegel_curves.csv">Descargar curvas</a>
+          </div>
+          <div class="status" id="status"></div>
+        </div>
+
+        <div class="tabpanel" id="panel-svensson">
+          <h2 class="model-heading">Nelson-Siegel-Svensson</h2>
+          <div class="model-form">
+            <div class="field">
+              <label>Columnas para Svensson</label>
+              <div id="svColumns" class="chip-grid model-chips"></div>
+            </div>
+            <div class="field">
+              <label>Lambda 1</label>
+              <input id="svLambda1" type="number" step="0.0001" value="0.0609" />
+            </div>
+            <div class="field">
+              <label>Lambda 2</label>
+              <input id="svLambda2" type="number" step="0.0001" value="0.2000" />
+            </div>
+            <div class="field">
+              <label>Fecha base</label>
+              <select id="svBaseDate"></select>
+            </div>
+            <div class="field">
+              <label>Fechas a comparar</label>
+              <div class="compare-picker">
+                <select id="svCompareYear"></select>
+                <select id="svCompareMonth"></select>
+                <select id="svCompareDay"></select>
+              </div>
+              <div id="svCompareDates" class="chip-grid model-chips"></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="svRunBtn" disabled>Actualizar Svensson</button>
+            </div>
+          </div>
+          <div class="toolbar">
+            <div class="badges">
+              <div class="badge" id="metaRowsSv">Filas: -</div>
+              <div class="badge" id="metaColsSv">Series: -</div>
+            </div>
+          </div>
+          <div class="model-grid">
+            <div>
+              <div class="chart-card-title">Factores estimados</div>
+              <div id="factorChartSv" class="chart"></div>
+            </div>
+            <div>
+              <div class="chart-card-title">Curvas Svensson</div>
+              <div id="curveChartSv" class="chart"></div>
+            </div>
+          </div>
+          <div class="download-row">
+            <a class="btn btn-ghost hidden-download" id="svBetasDownload" href="#" download="svensson_betas.csv">Descargar betas</a>
+            <a class="btn btn-ghost hidden-download" id="svCurvesDownload" href="#" download="svensson_curves.csv">Descargar curvas</a>
+          </div>
+          <div class="status" id="statusSv"></div>
+        </div>
+
+        <div class="tabpanel" id="panel-cubic-spline">
+          <h2 class="model-heading">Cubic spline</h2>
+          <div class="model-form">
+            <div class="field">
+              <label>Columnas para Cubic spline</label>
+              <div id="splineColumns" class="chip-grid model-chips"></div>
+            </div>
+            <div class="field">
+              <label>Fecha base</label>
+              <select id="splineBaseDate"></select>
+            </div>
+            <div class="field">
+              <label>Fechas a comparar</label>
+              <div class="compare-picker">
+                <select id="splineCompareYear"></select>
+                <select id="splineCompareMonth"></select>
+                <select id="splineCompareDay"></select>
+              </div>
+              <div id="splineCompareDates" class="chip-grid model-chips"></div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="splineRunBtn" disabled>Actualizar Cubic spline</button>
+            </div>
+          </div>
+          <div class="toolbar">
+            <div class="badges">
+              <div class="badge" id="metaRowsSpline">Filas: -</div>
+              <div class="badge" id="metaColsSpline">Series: -</div>
+            </div>
+          </div>
+          <div class="model-grid">
+            <div>
+              <div class="chart-card-title">Curvas interpoladas</div>
+              <div id="curveChartSpline" class="chart"></div>
+            </div>
+            <div>
+              <div class="chart-card-title">Observadas</div>
+              <div id="factorChartSpline" class="chart"></div>
+            </div>
+          </div>
+          <div class="download-row single">
+            <a class="btn btn-ghost hidden-download" id="splineCurvesDownload" href="#" download="cubic_spline_curves.csv">Descargar curvas</a>
+          </div>
+          <div class="status" id="statusSpline"></div>
         </div>
       </main>
     </section>
   </div>
 
   <script>
-    const series = [
-      "TPM", "SPC_03Y", "SPC_06Y", "SPC_1Y",
-      "SPC_2Y", "SPC_3Y", "SPC_4Y", "SPC_5Y", "SPC_10Y"
-    ];
-
-    const chipContainer = document.getElementById("seriesChips");
-    series.forEach((name) => {
-      const chip = document.createElement("div");
-      chip.className = "chip active";
-      chip.textContent = name;
-      chip.addEventListener("click", () => chip.classList.toggle("active"));
-      chipContainer.appendChild(chip);
-    });
-
+    const API_BASE = (window.YIELD_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+    const DEFAULT_COLUMNS = ["TPM", "SPC_03Y", "SPC_06Y", "SPC_1Y", "SPC_2Y", "SPC_3Y", "SPC_4Y", "SPC_5Y", "SPC_10Y"];
     const tabs = document.querySelectorAll(".tab");
-    const modelBadge = document.getElementById("modelBadge");
+    const panels = document.querySelectorAll(".tabpanel");
+    const authScreen = document.getElementById("authScreen");
+    const workspaceHero = document.getElementById("workspaceHero");
+    const workspaceLayout = document.getElementById("workspaceLayout");
+    let currentData = null;
+    let currentSampleRows = [];
+    const currentCalculations = {
+      "nelson-siegel": null,
+      "svensson": null,
+      "cubic-spline": null,
+    };
 
-    const x = [1, 3, 6, 12, 24, 36, 48, 60, 120];
-    const palette = [
-      { line: "#f5a623", point: "#ffd166", date: "2024-12-31" },
-      { line: "#37c7ff", point: "#7ee787", date: "2024-06-30" },
-      { line: "#ff6b6b", point: "#c7f464", date: "2023-12-31" }
-    ];
+    const modelConfigs = {
+      "nelson-siegel": {
+        columnsSelect: "nsColumns",
+        baseDate: "nsBaseDate",
+        compareYear: "nsCompareYear",
+        compareMonth: "nsCompareMonth",
+        compareDay: "nsCompareDay",
+        compareDates: "nsCompareDates",
+        runBtn: "nsRunBtn",
+        curveChart: "curveChart",
+        factorChart: "factorChart",
+        status: "status",
+        metaRows: "metaRows",
+        metaCols: "metaCols",
+        lambdaValue: "nsLambda",
+        betasDownload: "nsBetasDownload",
+        curvesDownload: "nsCurvesDownload",
+      },
+      "svensson": {
+        columnsSelect: "svColumns",
+        baseDate: "svBaseDate",
+        compareYear: "svCompareYear",
+        compareMonth: "svCompareMonth",
+        compareDay: "svCompareDay",
+        compareDates: "svCompareDates",
+        runBtn: "svRunBtn",
+        curveChart: "curveChartSv",
+        factorChart: "factorChartSv",
+        status: "statusSv",
+        metaRows: "metaRowsSv",
+        metaCols: "metaColsSv",
+        lambda1: "svLambda1",
+        lambda2: "svLambda2",
+        betasDownload: "svBetasDownload",
+        curvesDownload: "svCurvesDownload",
+      },
+      "cubic-spline": {
+        columnsSelect: "splineColumns",
+        baseDate: "splineBaseDate",
+        compareYear: "splineCompareYear",
+        compareMonth: "splineCompareMonth",
+        compareDay: "splineCompareDay",
+        compareDates: "splineCompareDates",
+        runBtn: "splineRunBtn",
+        curveChart: "curveChartSpline",
+        factorChart: "factorChartSpline",
+        status: "statusSpline",
+        metaRows: "metaRowsSpline",
+        metaCols: "metaColsSpline",
+        curvesDownload: "splineCurvesDownload",
+      },
+    };
 
-    function nsCurve(level, slope, bump, tilt = 0) {
-      return x.map((m, i) => {
-        const t = m / 12;
-        return level + slope * Math.exp(-t / 2.2) + bump * Math.sin((i + 1) / 2.4) * 0.14 + tilt * (i / 8);
+    function api(path) {
+      return `${API_BASE}${path}`;
+    }
+
+    function setLoggedIn(loggedIn) {
+      authScreen.classList.toggle("hidden", loggedIn);
+      workspaceHero.classList.toggle("hidden", !loggedIn);
+      workspaceLayout.classList.toggle("hidden", !loggedIn);
+    }
+
+    function setControlsEnabled(enabled) {
+      Object.values(modelConfigs).forEach(config => {
+        document.getElementById(config.runBtn).disabled = !enabled;
+        document.getElementById(config.baseDate).disabled = !enabled;
+        document.getElementById(config.compareYear).disabled = !enabled;
+        document.getElementById(config.compareMonth).disabled = !enabled;
+        document.getElementById(config.compareDay).disabled = !enabled;
+        document.getElementById(config.compareDates).style.pointerEvents = enabled ? "auto" : "none";
+        document.getElementById(config.compareDates).style.opacity = enabled ? "1" : "0.55";
+        document.getElementById(config.columnsSelect).style.pointerEvents = enabled ? "auto" : "none";
+        document.getElementById(config.columnsSelect).style.opacity = enabled ? "1" : "0.55";
+        if (config.lambdaValue) document.getElementById(config.lambdaValue).disabled = !enabled;
+        if (config.lambda1) document.getElementById(config.lambda1).disabled = !enabled;
+        if (config.lambda2) document.getElementById(config.lambda2).disabled = !enabled;
       });
     }
 
-    const observedSet = [
-      [8.15, 7.85, 7.62, 7.25, 6.90, 6.68, 6.52, 6.38, 6.10],
-      [10.05, 9.78, 9.44, 8.95, 8.36, 8.02, 7.77, 7.60, 7.28],
-      [4.95, 4.82, 4.70, 4.56, 4.39, 4.32, 4.28, 4.25, 4.22]
-    ];
-
-    function buildTraces(model) {
-      const traces = [];
-      const models = {
-        ns: [
-          nsCurve(6.10, 2.00, 0.65, -0.05),
-          nsCurve(7.30, 2.50, 0.90, -0.10),
-          nsCurve(4.20, 0.90, 0.30, 0.02)
-        ],
-        sv: [
-          nsCurve(6.08, 1.95, 1.05, -0.08),
-          nsCurve(7.28, 2.45, 1.22, -0.11),
-          nsCurve(4.18, 0.88, 0.55, 0.03)
-        ],
-        cs: observedSet.map(arr => arr.map((v, i) => v + Math.sin(i / 1.8) * 0.04))
-      };
-
-      palette.forEach((item, i) => {
-        traces.push({
-          x,
-          y: models[model][i],
-          type: "scatter",
-          mode: "lines",
-          name: `Estimada ${item.date}`,
-          line: { color: item.line, width: 3 },
-          hovertemplate: "Madurez: %{x} meses<br>Tasa estimada: %{y:.4f}<extra></extra>"
-        });
-
-        traces.push({
-          x,
-          y: observedSet[i],
-          type: "scatter",
-          mode: "lines+markers",
-          name: `Observada ${item.date}`,
-          line: { color: item.point, width: 1.5, dash: "dot" },
-          marker: {
-            size: 9,
-            color: item.point,
-            line: { color: "#081018", width: 1 }
-          },
-          hovertemplate: "Madurez: %{x} meses<br>Tasa observada: %{y:.4f}<extra></extra>"
-        });
-      });
-
-      return traces;
+    function activatePanel(panelName) {
+      tabs.forEach(tab => tab.classList.toggle("active", tab.dataset.panel === panelName));
+      panels.forEach(panel => panel.classList.toggle("active", panel.id === `panel-${panelName}`));
     }
 
-    function render(model) {
-      const labels = {
-        ns: "Modelo: Nelson-Siegel",
-        sv: "Modelo: Svensson",
-        cs: "Modelo: Cubic Spline"
+    function modelUI(modelName) {
+      const config = modelConfigs[modelName];
+      return {
+        status: document.getElementById(config.status),
+        curveChart: config.curveChart,
+        factorChart: config.factorChart,
+        metaRows: document.getElementById(config.metaRows),
+        metaCols: document.getElementById(config.metaCols),
       };
-      modelBadge.textContent = labels[model];
+    }
 
-      Plotly.newPlot(
-        "curveChart",
-        buildTraces(model),
-        {
-          paper_bgcolor: "#0b1016",
-          plot_bgcolor: "#0f1822",
-          margin: { l: 54, r: 20, t: 18, b: 52 },
-          font: { color: "#dde7f1", family: "Space Grotesk, sans-serif" },
-          legend: {
-            orientation: "h",
-            x: 0,
-            y: 1.1,
-            bgcolor: "rgba(0,0,0,0)"
-          },
-          xaxis: {
-            title: "Madurez (meses)",
-            range: [-5, 125],
-            gridcolor: "#213346",
-            zerolinecolor: "#213346"
-          },
-          yaxis: {
-            title: "Tasa",
-            gridcolor: "#213346",
-            zerolinecolor: "#213346"
-          }
-        },
-        { responsive: true, displayModeBar: false }
-      );
+    function updateModelMeta(modelName, rowsUsed, columns) {
+      const ui = modelUI(modelName);
+      ui.metaRows.textContent = `Filas: ${rowsUsed}`;
+      ui.metaCols.textContent = `Series: ${columns.join(", ")}`;
+    }
+
+    function selectedColumns(modelName) {
+      return [...document.getElementById(modelConfigs[modelName].columnsSelect).querySelectorAll(".chip.active")]
+        .map(chip => chip.dataset.value);
+    }
+
+    function populateModelColumns(columns) {
+      Object.values(modelConfigs).forEach(config => {
+        const container = document.getElementById(config.columnsSelect);
+        container.innerHTML = "";
+        columns.forEach(column => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "chip active";
+          chip.dataset.value = column;
+          chip.textContent = column;
+          chip.addEventListener("click", () => {
+            chip.classList.toggle("active");
+          });
+          container.appendChild(chip);
+        });
+      });
+    }
+
+    function fillDataSortColumns(columns) {
+      const sortSelect = document.getElementById("dataSortColumn");
+      sortSelect.innerHTML = "";
+      columns.forEach(column => {
+        const option = document.createElement("option");
+        option.value = column;
+        option.textContent = column;
+        sortSelect.appendChild(option);
+      });
+      if (columns.includes("Date")) {
+        sortSelect.value = "Date";
+      }
+    }
+
+    function renderSampleTable(rows) {
+      const head = document.getElementById("dataTableHead");
+      const body = document.getElementById("dataTableBody");
+      head.innerHTML = "";
+      body.innerHTML = "";
+      if (!rows || rows.length === 0) {
+        document.getElementById("dataSummary").textContent = "No hay filas disponibles para mostrar.";
+        return;
+      }
+
+      const columns = Object.keys(rows[0]);
+      const headRow = document.createElement("tr");
+      columns.forEach(column => {
+        const th = document.createElement("th");
+        th.textContent = column;
+        headRow.appendChild(th);
+      });
+      head.appendChild(headRow);
+
+      rows.forEach(row => {
+        const tr = document.createElement("tr");
+        columns.forEach(column => {
+          const td = document.createElement("td");
+          const value = row[column];
+          td.textContent = typeof value === "number" ? value.toFixed(4) : value;
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    function updateDataTable() {
+      if (!currentSampleRows || currentSampleRows.length === 0) {
+        renderSampleTable([]);
+        return;
+      }
+
+      const sortColumn = document.getElementById("dataSortColumn").value || "Date";
+      const sortDirection = document.getElementById("dataSortDirection").value || "desc";
+      const rowLimit = Number(document.getElementById("dataRowLimit").value || 25);
+      const sortedRows = [...currentSampleRows].sort((left, right) => {
+        const a = left[sortColumn];
+        const b = right[sortColumn];
+        if (sortColumn === "Date") {
+          return sortDirection === "asc"
+            ? String(a).localeCompare(String(b))
+            : String(b).localeCompare(String(a));
+        }
+        const aNum = Number(a);
+        const bNum = Number(b);
+        return sortDirection === "asc" ? aNum - bNum : bNum - aNum;
+      });
+      renderSampleTable(sortedRows.slice(0, rowLimit));
     }
 
     tabs.forEach(tab => {
       tab.addEventListener("click", () => {
-        tabs.forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-        render(tab.dataset.model);
+        activatePanel(tab.dataset.panel);
       });
     });
 
-    render("ns");
+    function curveTraces(curves) {
+      const palette = [
+        { line: "#f5a623", point: "#ffd166" },
+        { line: "#35c2ff", point: "#7ae582" },
+        { line: "#ff6b6b", point: "#c7f464" },
+        { line: "#c792ea", point: "#82aaff" },
+        { line: "#f78c6c", point: "#89ddff" },
+        { line: "#addb67", point: "#f07178" }
+      ];
+      const traces = [];
+      curves.forEach((curve, idx) => {
+        const colors = palette[idx % palette.length];
+        traces.push({
+          x: curve.curve_months,
+          y: curve.estimated,
+          type: "scatter",
+          mode: "lines",
+          name: `Estimada ${curve.date}`,
+          line: { color: colors.line, width: 3 },
+          hovertemplate: "Madurez: %{x} meses<br>Tasa estimada: %{y:.4f}<extra></extra>"
+        });
+        traces.push({
+          x: curve.observed_months,
+          y: curve.observed,
+          type: "scatter",
+          mode: "lines+markers",
+          name: `Observada ${curve.date}`,
+          line: { color: colors.point, width: 1.5, dash: "dot" },
+          marker: { color: colors.point, size: 9, line: { color: "#081018", width: 1 } },
+          hovertemplate: "Madurez: %{x} meses<br>Tasa observada: %{y:.4f}<extra></extra>"
+        });
+      });
+      return traces;
+    }
+
+    function factorTraces(factors) {
+      const colors = ["#f5a623", "#35c2ff", "#ffd166", "#7ae582"];
+      return factors.map((factor, idx) => ({
+        x: factor.dates,
+        y: factor.values,
+        type: "scatter",
+        mode: "lines",
+        name: factor.name,
+        line: { color: colors[idx % colors.length], width: 2 },
+        hovertemplate: "Fecha: %{x}<br>Valor: %{y:.4f}<extra></extra>"
+      }));
+    }
+
+    function populateDateSelectors(dates) {
+      Object.values(modelConfigs).forEach(config => {
+        const baseDate = document.getElementById(config.baseDate);
+        const compareYear = document.getElementById(config.compareYear);
+        const compareMonth = document.getElementById(config.compareMonth);
+        const compareDay = document.getElementById(config.compareDay);
+        const compareDates = document.getElementById(config.compareDates);
+        baseDate.innerHTML = "";
+        compareYear.innerHTML = "";
+        compareMonth.innerHTML = "";
+        compareDay.innerHTML = "";
+        compareDates.innerHTML = "";
+
+        dates.forEach((date, index) => {
+          const option = document.createElement("option");
+          option.value = date;
+          option.textContent = date;
+          if (index === dates.length - 1) option.selected = true;
+          baseDate.appendChild(option);
+        });
+
+        initializeCompareSelectors(config, dates);
+      });
+    }
+
+    function fillSelect(selectElement, placeholderText, values) {
+      selectElement.innerHTML = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = placeholderText;
+      placeholder.selected = true;
+      selectElement.appendChild(placeholder);
+      values.forEach(value => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        selectElement.appendChild(option);
+      });
+    }
+
+    function initializeCompareSelectors(config, dates) {
+      const compareYear = document.getElementById(config.compareYear);
+      const compareMonth = document.getElementById(config.compareMonth);
+      const compareDay = document.getElementById(config.compareDay);
+      const years = [...new Set(dates.map(date => date.slice(0, 4)))];
+      fillSelect(compareYear, "Año", years);
+      fillSelect(compareMonth, "Mes", []);
+      fillSelect(compareDay, "Día", []);
+    }
+
+    function updateCompareMonthOptions(config, dates) {
+      const compareYear = document.getElementById(config.compareYear).value;
+      const compareMonth = document.getElementById(config.compareMonth);
+      const compareDay = document.getElementById(config.compareDay);
+      if (!compareYear) {
+        fillSelect(compareMonth, "Mes", []);
+        fillSelect(compareDay, "Día", []);
+        return;
+      }
+
+      const months = [...new Set(
+        dates
+          .filter(date => date.startsWith(compareYear + "-"))
+          .map(date => date.slice(5, 7))
+      )];
+      fillSelect(compareMonth, "Mes", months);
+      fillSelect(compareDay, "Día", []);
+    }
+
+    function updateCompareDayOptions(config, dates) {
+      const compareYear = document.getElementById(config.compareYear).value;
+      const compareMonth = document.getElementById(config.compareMonth).value;
+      const compareDay = document.getElementById(config.compareDay);
+      if (!compareYear || !compareMonth) {
+        fillSelect(compareDay, "Día", []);
+        return;
+      }
+
+      const days = dates
+        .filter(date => date.startsWith(`${compareYear}-${compareMonth}-`))
+        .map(date => date.slice(8, 10));
+      fillSelect(compareDay, "Día", days);
+    }
+
+    function addCompareDateChip(containerId, date, modelName) {
+      const container = document.getElementById(containerId);
+      if ([...container.querySelectorAll(".chip")].some(chip => chip.dataset.value === date)) {
+        return;
+      }
+      if (container.querySelectorAll(".chip").length >= 5) {
+        return;
+      }
+
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip active";
+      chip.dataset.value = date;
+      chip.textContent = `${date} ×`;
+      chip.addEventListener("click", () => {
+        chip.remove();
+        if (currentCalculations[modelName]) {
+          plotCurves(modelName);
+        }
+      });
+      container.appendChild(chip);
+      if (currentCalculations[modelName]) {
+        plotCurves(modelName);
+      }
+    }
+
+    function csvUrlFromRows(rows) {
+      if (!rows || rows.length === 0) {
+        return null;
+      }
+      const headers = Object.keys(rows[0]);
+      const lines = [
+        headers.join(","),
+        ...rows.map(row => headers.map(header => row[header] ?? "").join(",")),
+      ];
+      return URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }));
+    }
+
+    function buildCurveDownloadRows(curves) {
+      const rows = [];
+      curves.forEach(curve => {
+        curve.curve_months.forEach((month, idx) => {
+          rows.push({
+            Date: curve.date,
+            MaturityMonths: month,
+            EstimatedRate: curve.estimated[idx],
+          });
+        });
+        curve.observed_months.forEach((month, idx) => {
+          rows.push({
+            Date: curve.date,
+            MaturityMonths: month,
+            ObservedRate: curve.observed[idx],
+          });
+        });
+      });
+      return rows;
+    }
+
+    function setDownloadLink(elementId, rows) {
+      const element = document.getElementById(elementId);
+      const url = csvUrlFromRows(rows);
+      if (url) {
+        element.href = url;
+        element.classList.remove("hidden-download");
+        element.classList.remove("hidden");
+      } else {
+        element.href = "#";
+        element.classList.add("hidden-download");
+      }
+    }
+
+    async function loginAndLoadData() {
+      const authStatus = document.getElementById("authStatus");
+      const status = modelUI("nelson-siegel").status;
+      authStatus.textContent = "Cargando base BCCh...";
+      status.textContent = "Cargando base BCCh...";
+      currentData = null;
+      Object.keys(currentCalculations).forEach(key => {
+        currentCalculations[key] = null;
+      });
+      const payload = {
+        user: document.getElementById("user").value,
+        password: document.getElementById("password").value,
+        start_date: "2005-01-01",
+        columns: DEFAULT_COLUMNS
+      };
+
+      try {
+        const response = await fetch(api("/api/login"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "No se pudo cargar la base.");
+        }
+
+        currentData = data;
+        currentSampleRows = data.meta.sample_rows || [];
+        populateModelColumns(data.meta.columns);
+        updateModelMeta("nelson-siegel", data.meta.rows_used, data.meta.columns);
+        updateModelMeta("svensson", data.meta.rows_used, data.meta.columns);
+        updateModelMeta("cubic-spline", data.meta.rows_used, data.meta.columns);
+        document.getElementById("dataSummary").textContent = `Filas originales: ${data.meta.raw_row_count} | Filas usadas: ${data.meta.rows_used} | Filas eliminadas por NA: ${data.meta.removed_rows}`;
+        fillDataSortColumns(["Date", ...data.meta.columns]);
+        updateDataTable();
+        const downloadButton = document.getElementById("downloadCleanDataBtn");
+        downloadButton.href = api(`/api/data/${data.data_id}/download`);
+        downloadButton.classList.remove("hidden");
+        populateDateSelectors(data.meta.available_dates);
+        setControlsEnabled(true);
+        setLoggedIn(true);
+        activatePanel("modelo");
+        authStatus.textContent = "";
+        status.textContent = "Base cargada. Ahora configura modelo y presiona Calcular.";
+      } catch (error) {
+        authStatus.textContent = error.message;
+        status.textContent = error.message;
+      }
+    }
+
+    async function runModel(modelName) {
+      const status = modelUI(modelName).status;
+      if (!currentData) {
+        status.textContent = "Primero debes entrar y cargar la base.";
+        return;
+      }
+
+      if (selectedColumns(modelName).length < 3) {
+        status.textContent = "Selecciona al menos 3 tasas para estimar el modelo.";
+        return;
+      }
+
+      status.textContent = "Calculando modelo...";
+      currentCalculations[modelName] = null;
+      const payload = {
+        data_id: currentData.data_id,
+        model: modelName,
+        columns: selectedColumns(modelName),
+      };
+      if (modelName === "nelson-siegel") {
+        payload.lambda_value = Number(document.getElementById("nsLambda").value);
+      }
+      if (modelName === "svensson") {
+        payload.lambda1 = Number(document.getElementById("svLambda1").value);
+        payload.lambda2 = Number(document.getElementById("svLambda2").value);
+      }
+
+      try {
+        const response = await fetch(api("/api/calculate"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "No se pudo calcular.");
+        }
+
+        currentCalculations[modelName] = data;
+        updateModelMeta(modelName, data.meta.rows_used, data.meta.columns);
+        populateDateSelectors(data.meta.available_dates);
+        activatePanel(modelName);
+        await plotCurves(modelName);
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    }
+
+    async function plotCurves(modelName) {
+      const status = modelUI(modelName).status;
+      const currentCalculation = currentCalculations[modelName];
+      if (!currentCalculation) {
+        status.textContent = "Primero debes calcular el modelo.";
+        return;
+      }
+
+      const config = modelConfigs[modelName];
+      const baseDate = document.getElementById(config.baseDate).value;
+      const compareDates = [...document.getElementById(config.compareDates).querySelectorAll(".chip.active")]
+        .map(chip => chip.dataset.value);
+      const payload = {
+        calc_id: currentCalculation.calc_id,
+        curve_dates: [baseDate, ...compareDates.filter(date => date !== baseDate)].slice(0, 6)
+      };
+
+      status.textContent = "Graficando...";
+      try {
+        const response = await fetch(api("/api/plot"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || "No se pudo graficar.");
+        }
+
+        const ui = modelUI(modelName);
+        Plotly.newPlot(ui.curveChart, curveTraces(data.curves), {
+          paper_bgcolor: "#0b1016",
+          plot_bgcolor: "#0f1822",
+          margin: { l: 54, r: 20, t: 18, b: 52 },
+          font: { color: "#dde7f1", family: "Space Grotesk, sans-serif" },
+          legend: { orientation: "h", x: 0, y: 1.08, bgcolor: "rgba(0,0,0,0)" },
+          xaxis: { title: "Madurez (meses)", range: [-5, 125], gridcolor: "#223548", zerolinecolor: "#223548" },
+          yaxis: { title: "Tasa", gridcolor: "#223548", zerolinecolor: "#223548" }
+        }, { responsive: true, displayModeBar: false });
+
+        if (data.factors.length > 0) {
+          Plotly.newPlot(ui.factorChart, factorTraces(data.factors), {
+            paper_bgcolor: "#0b1016",
+            plot_bgcolor: "#0f1822",
+            margin: { l: 54, r: 20, t: 18, b: 52 },
+            font: { color: "#dde7f1", family: "Space Grotesk, sans-serif" },
+            legend: { orientation: "h", x: 0, y: 1.08, bgcolor: "rgba(0,0,0,0)" },
+            xaxis: { title: "Fecha", gridcolor: "#223548", zerolinecolor: "#223548" },
+            yaxis: { title: "Factor", gridcolor: "#223548", zerolinecolor: "#223548" }
+          }, { responsive: true, displayModeBar: false });
+          document.getElementById(ui.factorChart).style.display = "block";
+        } else if (modelName === "cubic-spline") {
+          const observedOnly = data.curves.map(curve => ({
+            x: curve.observed_months,
+            y: curve.observed,
+            type: "scatter",
+            mode: "lines+markers",
+            name: `Observada ${curve.date}`,
+            line: { color: "#ffd166", width: 1.5, dash: "dot" },
+            marker: { color: "#ffd166", size: 9, line: { color: "#081018", width: 1 } },
+          }));
+          Plotly.newPlot(ui.factorChart, observedOnly, {
+            paper_bgcolor: "#0b1016",
+            plot_bgcolor: "#0f1822",
+            margin: { l: 54, r: 20, t: 18, b: 52 },
+            font: { color: "#dde7f1", family: "Space Grotesk, sans-serif" },
+            legend: { orientation: "h", x: 0, y: 1.08, bgcolor: "rgba(0,0,0,0)" },
+            xaxis: { title: "Madurez (meses)", range: [-5, 125], gridcolor: "#223548", zerolinecolor: "#223548" },
+            yaxis: { title: "Tasa observada", gridcolor: "#223548", zerolinecolor: "#223548" }
+          }, { responsive: true, displayModeBar: false });
+          document.getElementById(ui.factorChart).style.display = "block";
+        } else {
+          document.getElementById(ui.factorChart).style.display = "none";
+        }
+
+        if (config.betasDownload) {
+          setDownloadLink(config.betasDownload, data.factors.length > 0 ? data.factors[0].dates.map((date, index) => {
+            const row = { Date: date };
+            data.factors.forEach(factor => {
+              row[factor.name] = factor.values[index];
+            });
+            return row;
+          }) : []);
+        }
+        setDownloadLink(config.curvesDownload, buildCurveDownloadRows(data.curves));
+        activatePanel(modelName);
+        status.textContent = "Grafico actualizado.";
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    }
+
+    Object.entries(modelConfigs).forEach(([modelName, config]) => {
+      document.getElementById(config.compareYear).addEventListener("change", () => {
+        const calculation = currentCalculations[modelName];
+        const dates = calculation?.meta?.available_dates || currentData?.meta?.available_dates || [];
+        updateCompareMonthOptions(config, dates);
+      });
+      document.getElementById(config.compareMonth).addEventListener("change", () => {
+        const calculation = currentCalculations[modelName];
+        const dates = calculation?.meta?.available_dates || currentData?.meta?.available_dates || [];
+        updateCompareDayOptions(config, dates);
+      });
+      document.getElementById(config.compareDay).addEventListener("change", () => {
+        const compareYear = document.getElementById(config.compareYear).value;
+        const compareMonth = document.getElementById(config.compareMonth).value;
+        const compareDay = document.getElementById(config.compareDay).value;
+        if (compareYear && compareMonth && compareDay) {
+          addCompareDateChip(config.compareDates, `${compareYear}-${compareMonth}-${compareDay}`, modelName);
+          document.getElementById(config.compareDay).value = "";
+        }
+      });
+      document.getElementById(config.baseDate).addEventListener("change", () => {
+        if (currentCalculations[modelName]) {
+          plotCurves(modelName);
+        }
+      });
+    });
+
+    setLoggedIn(false);
+    setControlsEnabled(false);
+    activatePanel("modelo");
+    document.getElementById("loginBtn").addEventListener("click", loginAndLoadData);
+    document.getElementById("dataSortColumn").addEventListener("change", updateDataTable);
+    document.getElementById("dataSortDirection").addEventListener("change", updateDataTable);
+    document.getElementById("dataRowLimit").addEventListener("change", updateDataTable);
+    document.getElementById("nsRunBtn").addEventListener("click", () => runModel("nelson-siegel"));
+    document.getElementById("svRunBtn").addEventListener("click", () => runModel("svensson"));
+    document.getElementById("splineRunBtn").addEventListener("click", () => runModel("cubic-spline"));
   </script>
 </body>
 </html>

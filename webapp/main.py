@@ -6,6 +6,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -25,6 +26,13 @@ from yield_curve import (
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app = FastAPI(title="Yield Curve Web App")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 CALCULATION_CACHE: dict[str, dict] = {}
 DATA_CACHE: dict[str, dict] = {}
 
@@ -199,6 +207,11 @@ async def index(request: Request) -> HTMLResponse:
             "rate_series": RATE_SERIES,
         },
     )
+
+
+@app.get("/api/health")
+async def api_health() -> dict:
+    return {"status": "ok"}
 
 
 @app.post("/api/login")
