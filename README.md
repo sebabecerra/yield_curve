@@ -50,6 +50,20 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Web App
+
+Version web real con backend Python:
+
+```bash
+uvicorn webapp.main:app --reload
+```
+
+Luego abre:
+
+```text
+http://127.0.0.1:8000
+```
+
 ## Generar animacion
 
 Puedes generar un GIF con la evolucion completa de las curvas:

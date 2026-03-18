@@ -34,7 +34,7 @@ class DiscreteNelsonSiegelResult:
     phi_summary: pd.DataFrame
 
 
-def prepare_rates_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def normalize_rates_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     prepared = df.copy()
     prepared = prepared.rename(columns=LEGACY_RATE_ALIASES)
     if "Date" not in prepared.columns:
@@ -50,6 +50,12 @@ def prepare_rates_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     if not rate_columns:
         raise ValueError("El archivo debe incluir al menos una columna de tasas.")
 
+    return prepared.reset_index(drop=True)
+
+
+def prepare_rates_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    prepared = normalize_rates_dataframe(df)
+    rate_columns = [column for column in prepared.columns if column != "Date"]
     prepared = prepared.dropna(subset=rate_columns, how="any")
     if prepared.empty:
         raise ValueError("No quedaron filas completas después de eliminar NA en las columnas de tasas.")
