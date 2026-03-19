@@ -123,6 +123,32 @@ export function reconstructSvenssonCurve(months, betasRow, lambda1, lambda2) {
   return evaluateDesign(design, [betasRow.level, betasRow.slope, betasRow.curvature_1, betasRow.curvature_2]);
 }
 
+export function fitAr1Series(values) {
+  const cleaned = values.filter(value => Number.isFinite(value));
+  if (cleaned.length < 2) throw new Error("Se necesitan al menos 2 observaciones para AR(1).");
+  const x = cleaned.slice(0, -1);
+  const y = cleaned.slice(1);
+  const xMean = x.reduce((sum, value) => sum + value, 0) / x.length;
+  const yMean = y.reduce((sum, value) => sum + value, 0) / y.length;
+  const numerator = x.reduce((sum, value, index) => sum + ((value - xMean) * (y[index] - yMean)), 0);
+  const denominator = x.reduce((sum, value) => sum + ((value - xMean) ** 2), 0);
+  const phi = Math.abs(denominator) < 1e-12 ? 0 : numerator / denominator;
+  const intercept = yMean - (phi * xMean);
+  const residuals = y.map((value, index) => value - intercept - (phi * x[index]));
+  const sigma = Math.sqrt(residuals.reduce((sum, value) => sum + (value ** 2), 0) / residuals.length);
+  return { intercept, phi, sigma };
+}
+
+export function projectAr1Series(model, lastValue, horizonSteps) {
+  const projected = [];
+  let current = lastValue;
+  for (let step = 1; step <= horizonSteps; step += 1) {
+    current = model.intercept + (model.phi * current);
+    projected.push(current);
+  }
+  return projected;
+}
+
 export function naturalCubicSpline(x, y, xTarget) {
   const n = x.length;
   if (n < 3) throw new Error("Se necesitan al menos 3 puntos para spline.");

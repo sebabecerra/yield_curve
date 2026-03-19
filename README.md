@@ -106,6 +106,30 @@ Eso significa que la aplicación:
 - no necesita backend para estimar
 - puede correr completa desde GitHub Pages
 
+## Registro de accesos por email
+
+La app puede registrar accesos en una hoja de Google Sheets sin backend propio.
+
+Archivos relevantes:
+
+- `api_js/config.js`
+- `api_js/google_apps_script.gs`
+
+Flujo:
+
+1. crea una hoja de cálculo en Google Sheets
+2. abre `Extensions -> Apps Script`
+3. pega el contenido de `api_js/google_apps_script.gs`
+4. despliega como `Web app`
+5. copia la URL pública del script
+6. pégala en `api_js/config.js`:
+
+```js
+window.YC_ACCESS_LOG_URL = "TU_URL_DE_APPS_SCRIPT";
+```
+
+Desde ese momento, cada email válido ingresado en la pantalla de acceso se envía también a la hoja `access_log`.
+
 ## Cómo probar localmente
 
 ```bash
@@ -172,4 +196,3 @@ Para mantener el repo limpio:
 - usa `git add api_js` cuando cambies la app pública
 - revisa `git status` antes de commitear
 - evita subir archivos pesados de trabajo local desde `papers/`
-

@@ -213,6 +213,15 @@ h1 {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px rgba(255,176,0,.28);
 }
+.assumption-box {
+  padding: 12px 14px;
+  border: 1px solid rgba(255,176,0,.14);
+  border-radius: 6px;
+  background: rgba(255,176,0,.03);
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 13px;
+}
 .split {
   display: grid;
   grid-template-columns: 1fr 1fr;

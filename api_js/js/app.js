@@ -1,9 +1,11 @@
 import {
   LEGACY_ALIASES,
   RATE_MONTHS,
+  fitAr1Series,
   fitNelsonSiegel,
   fitSvensson,
   naturalCubicSpline,
+  projectAr1Series,
   reconstructNelsonSiegelCurve,
   reconstructSvenssonCurve,
 } from "./models.js";
@@ -11,10 +13,12 @@ import { MARKET_ROWS } from "../data/market_rows.js";
 
 const LANG = document.documentElement.lang?.toLowerCase().startsWith("en") ? "en" : "es";
 const ACCESS_STORAGE_KEY = "yield_curve_access_email";
+const ACCESS_LOG_URL = (window.YC_ACCESS_LOG_URL || "").trim();
 const I18N = {
   es: {
     accessInvalid: "Ingresa un email válido para continuar.",
     accessStored: "Email actualizado.",
+    accessLogFailed: "No se pudo registrar el acceso remoto, pero el ingreso local sigue activo.",
     comparePlaceholder: "Ingrese fecha para comparar",
     loadedRows: "Filas cargadas",
     series: "Series",
@@ -25,10 +29,18 @@ const I18N = {
     date: "Fecha",
     factor: "Factor",
     observedRate: "Tasa observada",
+    projectedRate: "Tasa proyectada",
+    currentRate: "Tasa actual",
     selectAtLeast3: "Selecciona al menos 3 tasas.",
     selectAtLeast4: "Selecciona al menos 4 tasas.",
     noCompleteDates: "No hay fechas completas para las columnas elegidas.",
     chartUpdated: "Grafico actualizado.",
+    projectionUpdated: "Proyección actualizada.",
+    projectedCurvePrefix: "Proyectada",
+    currentCurvePrefix: "Actual",
+    horizon: "Horizonte",
+    ar1Projection: "Proyección AR(1)",
+    horizonSteps: "pasos",
     loadedBase: (rows, firstDate, lastDate, count) =>
       `Base real cargada: ${rows} filas, desde ${firstDate} hasta ${lastDate}. Fechas completas para el set base: ${count}.`,
     emptyBase: "La base integrada viene vacia o no se pudo parsear.",
@@ -37,6 +49,7 @@ const I18N = {
   en: {
     accessInvalid: "Enter a valid email to continue.",
     accessStored: "Email updated.",
+    accessLogFailed: "Remote access logging failed, but local access remains active.",
     comparePlaceholder: "Add comparison date",
     loadedRows: "Loaded rows",
     series: "Series",
@@ -47,10 +60,18 @@ const I18N = {
     date: "Date",
     factor: "Factor",
     observedRate: "Observed yield",
+    projectedRate: "Projected yield",
+    currentRate: "Current yield",
     selectAtLeast3: "Select at least 3 rates.",
     selectAtLeast4: "Select at least 4 rates.",
     noCompleteDates: "No complete dates are available for the selected columns.",
     chartUpdated: "Chart updated.",
+    projectionUpdated: "Projection updated.",
+    projectedCurvePrefix: "Projected",
+    currentCurvePrefix: "Current",
+    horizon: "Horizon",
+    ar1Projection: "AR(1) projection",
+    horizonSteps: "steps",
     loadedBase: (rows, firstDate, lastDate, count) =>
       `Embedded market dataset loaded: ${rows} rows, from ${firstDate} to ${lastDate}. Complete dates for the base set: ${count}.`,
     emptyBase: "The embedded dataset is empty or could not be parsed.",
@@ -58,16 +79,24 @@ const I18N = {
   },
 };
 const TEXT = I18N[LANG];
+const PROJECTION_HORIZONS = {
+  "1M": 21,
+  "3M": 63,
+  "6M": 126,
+  "12M": 252,
+};
 const state = {
   rows: [],
   accessEmail: "",
   availableDates: {
     ns: [],
+    pr: [],
     sv: [],
     sp: [],
   },
   calculations: {
     ns: null,
+    pr: null,
     sv: null,
     sp: null,
   },
@@ -91,19 +120,40 @@ function unlockAccess(email) {
   if (sessionEmail) sessionEmail.textContent = state.accessEmail;
 }
 
+async function logAccess(email) {
+  if (!ACCESS_LOG_URL) return { ok: false, skipped: true };
+  const payload = {
+    email: email.trim(),
+    language: LANG,
+    page: window.location.pathname,
+    userAgent: navigator.userAgent,
+  };
+  await fetch(ACCESS_LOG_URL, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    mode: "no-cors",
+  });
+  return { ok: true };
+}
+
 function setupAccessGate() {
   const input = document.getElementById("accessEmail");
   const button = document.getElementById("accessSubmit");
   const status = document.getElementById("accessStatus");
   const changeButton = document.getElementById("changeEmailBtn");
 
-  const submit = () => {
+  const submit = async () => {
     const email = input.value.trim();
     if (!isValidEmail(email)) {
       status.textContent = TEXT.accessInvalid;
       return;
     }
     status.textContent = TEXT.accessStored;
+    try {
+      await logAccess(email);
+    } catch (error) {
+      status.textContent = TEXT.accessLogFailed;
+    }
     unlockAccess(email);
   };
   button?.addEventListener("click", submit);
@@ -139,11 +189,23 @@ const modelConfigs = {
   sv: { cols: "svColumns", baseYear: "svBaseYear", baseMonth: "svBaseMonth", baseDay: "svBaseDay", compareYear: "svCompareYear", compareMonth: "svCompareMonth", compareDay: "svCompareDay", compare: "svCompareDates", status: "svStatus", curve: "svCurveChart", factor: "svFactorChart", betasDownload: "svBetasDownload", curvesDownload: "svCurvesDownload" },
   sp: { cols: "spColumns", baseYear: "spBaseYear", baseMonth: "spBaseMonth", baseDay: "spBaseDay", compareYear: "spCompareYear", compareMonth: "spCompareMonth", compareDay: "spCompareDay", compare: "spCompareDates", status: "spStatus", curve: "spCurveChart", factor: "spObsChart", curvesDownload: "spCurvesDownload" },
 };
+const projectionConfig = {
+  cols: "prColumns",
+  baseYear: "prBaseYear",
+  baseMonth: "prBaseMonth",
+  baseDay: "prBaseDay",
+  status: "prStatus",
+  factor: "prFactorChart",
+  curve: "prCurveChart",
+  betasDownload: "prBetasDownload",
+  curvesDownload: "prCurvesDownload",
+};
 
 function activatePanel(name) {
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.panel === name));
   document.querySelectorAll(".panel").forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
   if (name === "nelson-siegel") runNelsonSiegel();
+  if (name === "proyeccion") runProjection();
   if (name === "svensson") runSvensson();
   if (name === "cubic-spline") runSpline();
 }
@@ -296,9 +358,26 @@ function createColumnChips() {
       container.appendChild(chip);
     });
   });
+  const projectionContainer = document.getElementById(projectionConfig.cols);
+  projectionContainer.innerHTML = "";
+  columns.forEach(column => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip active";
+    chip.dataset.value = column;
+    chip.textContent = column;
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("active");
+      runProjection();
+    });
+    projectionContainer.appendChild(chip);
+  });
 }
 
 function selectedColumns(key) {
+  if (key === "pr") {
+    return [...document.querySelectorAll(`#${projectionConfig.cols} .chip.active`)].map(chip => chip.dataset.value);
+  }
   return [...document.querySelectorAll(`#${modelConfigs[key].cols} .chip.active`)].map(chip => chip.dataset.value);
 }
 
@@ -442,6 +521,53 @@ function fillDateControls(key, dates) {
   wireCompareDateControls(key);
 }
 
+function currentProjectionBaseDate() {
+  const year = document.getElementById(projectionConfig.baseYear).value;
+  const month = document.getElementById(projectionConfig.baseMonth).value;
+  const day = document.getElementById(projectionConfig.baseDay).value;
+  return year && month && day ? `${year}-${month}-${day}` : "";
+}
+
+function setProjectionBaseDate(date, triggerPlot = false) {
+  const dates = state.availableDates.pr || [];
+  if (!dates.includes(date)) return;
+  const map = buildDateMap(dates);
+  const [year, month, day] = date.split("-");
+  fillSelect(document.getElementById(projectionConfig.baseYear), map.years, LANG === "en" ? "Year" : "Año", year);
+  fillSelect(document.getElementById(projectionConfig.baseMonth), map.monthsByYear[year] || [], LANG === "en" ? "Month" : "Mes", month);
+  fillSelect(document.getElementById(projectionConfig.baseDay), map.daysByYearMonth[`${year}-${month}`] || [], LANG === "en" ? "Day" : "Día", day);
+  if (triggerPlot && state.calculations.pr) plotProjection();
+}
+
+function wireProjectionBaseDateControls() {
+  const yearSelect = document.getElementById(projectionConfig.baseYear);
+  const monthSelect = document.getElementById(projectionConfig.baseMonth);
+  const daySelect = document.getElementById(projectionConfig.baseDay);
+  const map = buildDateMap(state.availableDates.pr || []);
+
+  yearSelect.onchange = () => {
+    const year = yearSelect.value;
+    fillSelect(monthSelect, year ? (map.monthsByYear[year] || []) : [], LANG === "en" ? "Month" : "Mes");
+    fillSelect(daySelect, [], LANG === "en" ? "Day" : "Día");
+  };
+  monthSelect.onchange = () => {
+    const year = yearSelect.value;
+    const month = monthSelect.value;
+    fillSelect(daySelect, year && month ? (map.daysByYearMonth[`${year}-${month}`] || []) : [], LANG === "en" ? "Day" : "Día");
+  };
+  daySelect.onchange = () => {
+    if (state.calculations.pr) plotProjection();
+  };
+}
+
+function fillProjectionDateControls(dates) {
+  state.availableDates.pr = dates;
+  const current = currentProjectionBaseDate();
+  const target = dates.includes(current) ? current : (dates[dates.length - 1] || "");
+  if (target) setProjectionBaseDate(target, false);
+  wireProjectionBaseDateControls();
+}
+
 function initializeAllDateControls(rows) {
   const allColumns = availableColumns(rows);
   Object.keys(modelConfigs).forEach(key => {
@@ -449,6 +575,8 @@ function initializeAllDateControls(rows) {
     const dates = availableDates(rows, usableColumns);
     fillDateControls(key, dates);
   });
+  state.availableDates.pr = availableDates(rows, allColumns);
+  fillProjectionDateControls(state.availableDates.pr);
 }
 
 function addCompareChip(key, date) {
@@ -555,6 +683,30 @@ function runNelsonSiegel() {
   plotModel("ns");
 }
 
+function runProjection() {
+  if (!state.rows.length) return;
+  const columns = selectedColumns("pr");
+  if (columns.length < 3) {
+    setStatus(projectionConfig.status, TEXT.selectAtLeast3);
+    return;
+  }
+  const lambdaValue = Number(document.getElementById("prLambda").value);
+  const result = fitNelsonSiegel(state.rows, columns, lambdaValue);
+  const dates = availableDates(result.observed, result.columns);
+  if (!dates.length) {
+    setStatus(projectionConfig.status, TEXT.noCompleteDates);
+    return;
+  }
+  const models = {
+    level: fitAr1Series(result.betas.map(beta => beta.level)),
+    slope: fitAr1Series(result.betas.map(beta => beta.slope)),
+    curvature: fitAr1Series(result.betas.map(beta => beta.curvature)),
+  };
+  state.calculations.pr = { ...result, lambdaValue, dates, models };
+  fillProjectionDateControls(dates);
+  plotProjection();
+}
+
 function runSvensson() {
   if (!state.rows.length) return;
   const columns = selectedColumns("sv");
@@ -597,6 +749,121 @@ function buildCurveSelection(key) {
   const baseDate = currentBaseDate(key);
   const compareDates = [...document.querySelectorAll(`#${modelConfigs[key].compare} .chip.active`)].map(chip => chip.dataset.value);
   return [baseDate, ...compareDates.filter(date => date && date !== baseDate)].filter(Boolean).slice(0, 6);
+}
+
+function plotProjection() {
+  const calc = state.calculations.pr;
+  if (!calc) return;
+  const baseDate = currentProjectionBaseDate();
+  if (!baseDate) return;
+  const horizonLabel = document.getElementById("prHorizon").value;
+  const horizonSteps = PROJECTION_HORIZONS[horizonLabel] || PROJECTION_HORIZONS["1M"];
+  const baseBeta = calc.betas.find(item => item.Date === baseDate);
+  const baseObserved = calc.observed.find(item => item.Date === baseDate);
+  if (!baseBeta || !baseObserved) {
+    setStatus(projectionConfig.status, TEXT.noCompleteDates);
+    return;
+  }
+
+  const levelPath = projectAr1Series(calc.models.level, baseBeta.level, horizonSteps);
+  const slopePath = projectAr1Series(calc.models.slope, baseBeta.slope, horizonSteps);
+  const curvaturePath = projectAr1Series(calc.models.curvature, baseBeta.curvature, horizonSteps);
+  const projectedBeta = {
+    level: levelPath[levelPath.length - 1],
+    slope: slopePath[slopePath.length - 1],
+    curvature: curvaturePath[curvaturePath.length - 1],
+  };
+  const stepLabels = Array.from({ length: horizonSteps }, (_, index) => `t+${index + 1}`);
+  const months = Array.from({ length: 120 }, (_, index) => index + 1);
+  const currentCurve = reconstructNelsonSiegelCurve(months, baseBeta, calc.lambdaValue);
+  const projectedCurve = reconstructNelsonSiegelCurve(months, projectedBeta, calc.lambdaValue);
+
+  Plotly.newPlot(
+    projectionConfig.factor,
+    [
+      {
+        x: stepLabels,
+        y: levelPath,
+        type: "scatter",
+        mode: "lines",
+        name: "level",
+        line: { color: "#ffb000", width: 2.5 },
+        hovertemplate: `level<br>${TEXT.horizon}: %{x}<br>${TEXT.factor}: %{y:.2f}<extra></extra>`,
+      },
+      {
+        x: stepLabels,
+        y: slopePath,
+        type: "scatter",
+        mode: "lines",
+        name: "slope",
+        line: { color: "#35c2ff", width: 2.5 },
+        hovertemplate: `slope<br>${TEXT.horizon}: %{x}<br>${TEXT.factor}: %{y:.2f}<extra></extra>`,
+      },
+      {
+        x: stepLabels,
+        y: curvaturePath,
+        type: "scatter",
+        mode: "lines",
+        name: "curvature",
+        line: { color: "#ffd166", width: 2.5 },
+        hovertemplate: `curvature<br>${TEXT.horizon}: %{x}<br>${TEXT.factor}: %{y:.2f}<extra></extra>`,
+      },
+    ],
+    { ...plotLayout(TEXT.horizon, TEXT.factor), hovermode: "x unified" },
+    { responsive: true, displayModeBar: false },
+  );
+
+  Plotly.newPlot(
+    projectionConfig.curve,
+    [
+      {
+        x: months,
+        y: currentCurve,
+        type: "scatter",
+        mode: "lines",
+        name: `${TEXT.currentCurvePrefix} ${baseDate}`,
+        line: { color: "#35c2ff", width: 3 },
+        hovertemplate: `${TEXT.currentCurvePrefix}<br>${TEXT.date}: ${baseDate}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.currentRate}: %{y:.2f}<extra></extra>`,
+      },
+      {
+        x: months,
+        y: projectedCurve,
+        type: "scatter",
+        mode: "lines",
+        name: `${TEXT.projectedCurvePrefix} ${horizonLabel}`,
+        line: { color: "#ffb000", width: 3, dash: "dash" },
+        hovertemplate: `${TEXT.projectedCurvePrefix}<br>${TEXT.horizon}: ${horizonLabel}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.projectedRate}: %{y:.2f}<extra></extra>`,
+      },
+      {
+        x: calc.columns.map(column => RATE_MONTHS[column]),
+        y: calc.columns.map(column => baseObserved[column]),
+        type: "scatter",
+        mode: "markers",
+        name: `${TEXT.observedPrefix} ${baseDate}`,
+        marker: { color: "#ffd166", size: 8, line: { color: "#081018", width: 1 } },
+        hovertemplate: `${TEXT.observedPrefix}<br>${TEXT.date}: ${baseDate}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.rate}: %{y:.2f}<extra></extra>`,
+      },
+    ],
+    { ...plotLayout(TEXT.maturityMonths, TEXT.rate), hovermode: "closest" },
+    { responsive: true, displayModeBar: false },
+  );
+
+  const projectedRows = stepLabels.map((label, index) => ({
+    HorizonStep: label,
+    level: levelPath[index],
+    slope: slopePath[index],
+    curvature: curvaturePath[index],
+  }));
+  const curveRows = months.map((month, index) => ({
+    BaseDate: baseDate,
+    Horizon: horizonLabel,
+    MaturityMonths: month,
+    CurrentRate: currentCurve[index],
+    ProjectedRate: projectedCurve[index],
+  }));
+  setDownloadLink(projectionConfig.betasDownload, projectedRows);
+  setDownloadLink(projectionConfig.curvesDownload, curveRows);
+  setStatus(projectionConfig.status, `${TEXT.projectionUpdated} ${horizonLabel} | AR(1), ${horizonSteps} ${TEXT.horizonSteps}.`);
 }
 
 function plotModel(key) {
@@ -761,6 +1028,8 @@ try {
     });
   });
   document.getElementById("nsLambda")?.addEventListener("change", runNelsonSiegel);
+  document.getElementById("prLambda")?.addEventListener("change", runProjection);
+  document.getElementById("prHorizon")?.addEventListener("change", plotProjection);
   document.getElementById("svLambda1")?.addEventListener("change", runSvensson);
   document.getElementById("svLambda2")?.addEventListener("change", runSvensson);
   document.getElementById("dataSortColumn").addEventListener("change", renderDataTable);
