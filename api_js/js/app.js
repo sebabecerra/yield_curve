@@ -2,14 +2,15 @@ import {
   LEGACY_ALIASES,
   RATE_MONTHS,
   fitAr1Series,
+  fitDynamicNelsonSiegelKalman,
   fitNelsonSiegel,
   fitSvensson,
   naturalCubicSpline,
   projectAr1Series,
   reconstructNelsonSiegelCurve,
   reconstructSvenssonCurve,
-} from "./models.js";
-import { MARKET_ROWS } from "../data/market_rows.js";
+} from "./models.js?v=20260319b";
+import { MARKET_ROWS } from "../data/market_rows.js?v=20260319b";
 
 const LANG = document.documentElement.lang?.toLowerCase().startsWith("en") ? "en" : "es";
 const I18N = {
@@ -39,6 +40,7 @@ const I18N = {
     currentCurvePrefix: "Actual",
     horizon: "Horizonte",
     ar1Projection: "Proyección AR(1)",
+    kalmanProjection: "Filtro de Kalman",
     horizonSteps: "pasos",
     currentLabel: "Actual",
     loadedBase: (rows, firstDate, lastDate, count) =>
@@ -72,6 +74,7 @@ const I18N = {
     currentCurvePrefix: "Current",
     horizon: "Horizon",
     ar1Projection: "AR(1) projection",
+    kalmanProjection: "Kalman filter",
     horizonSteps: "steps",
     currentLabel: "Current",
     loadedBase: (rows, firstDate, lastDate, count) =>
@@ -90,12 +93,14 @@ const PROJECTION_HORIZONS = {
 const state = {
   rows: [],
   availableDates: {
+    kf: [],
     ns: [],
     pr: [],
     sv: [],
     sp: [],
   },
   calculations: {
+    kf: null,
     ns: null,
     pr: null,
     sv: null,
@@ -109,6 +114,7 @@ function setGlobalStatus(text) {
 }
 
 const modelConfigs = {
+  kf: { cols: "kfColumns", baseYear: "kfBaseYear", baseMonth: "kfBaseMonth", baseDay: "kfBaseDay", compareYear: "kfCompareYear", compareMonth: "kfCompareMonth", compareDay: "kfCompareDay", compare: "kfCompareDates", status: "kfStatus", curve: "kfCurveChart", factor: "kfForwardChart", betasDownload: "kfForwardDownload", curvesDownload: "kfCurvesDownload" },
   ns: { cols: "nsColumns", baseYear: "nsBaseYear", baseMonth: "nsBaseMonth", baseDay: "nsBaseDay", compareYear: "nsCompareYear", compareMonth: "nsCompareMonth", compareDay: "nsCompareDay", compare: "nsCompareDates", status: "nsStatus", curve: "nsCurveChart", factor: "nsFactorChart", betasDownload: "nsBetasDownload", curvesDownload: "nsCurvesDownload" },
   sv: { cols: "svColumns", baseYear: "svBaseYear", baseMonth: "svBaseMonth", baseDay: "svBaseDay", compareYear: "svCompareYear", compareMonth: "svCompareMonth", compareDay: "svCompareDay", compare: "svCompareDates", status: "svStatus", curve: "svCurveChart", factor: "svFactorChart", betasDownload: "svBetasDownload", curvesDownload: "svCurvesDownload" },
   sp: { cols: "spColumns", baseYear: "spBaseYear", baseMonth: "spBaseMonth", baseDay: "spBaseDay", compareYear: "spCompareYear", compareMonth: "spCompareMonth", compareDay: "spCompareDay", compare: "spCompareDates", status: "spStatus", curve: "spCurveChart", factor: "spObsChart", curvesDownload: "spCurvesDownload" },
@@ -128,13 +134,19 @@ const projectionConfig = {
 function activatePanel(name) {
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.panel === name));
   document.querySelectorAll(".panel").forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
-  if (name === "nelson-siegel") runNelsonSiegel();
-  if (name === "proyeccion") {
-    state.calculations.pr = null;
-    runProjection();
+  try {
+    if (name === "kalman") runKalman();
+    if (name === "nelson-siegel") runNelsonSiegel();
+    if (name === "proyeccion") {
+      state.calculations.pr = null;
+      runProjection();
+    }
+    if (name === "svensson") runSvensson();
+    if (name === "cubic-spline") runSpline();
+  } catch (error) {
+    setGlobalStatus(`Error JS: ${error.message || error}`);
+    if (name === "kalman") setStatus("kfStatus", error.message || String(error));
   }
-  if (name === "svensson") runSvensson();
-  if (name === "cubic-spline") runSpline();
 }
 
 function parseCSV(text) {
@@ -278,6 +290,7 @@ function createColumnChips() {
       chip.textContent = column;
       chip.addEventListener("click", () => {
         chip.classList.toggle("active");
+        if (key === "kf") runKalman();
         if (key === "ns") runNelsonSiegel();
         if (key === "sv") runSvensson();
         if (key === "sp") runSpline();
@@ -591,6 +604,64 @@ function factorTraces(factors) {
   }));
 }
 
+function forwardCurveFromSpot(curve) {
+  const forwards = [];
+  for (let m = 1; m < curve.length; m += 1) {
+    const t1 = m / 12;
+    const t2 = (m + 1) / 12;
+    const z1 = (curve[m - 1] || 0) / 100;
+    const z2 = (curve[m] || 0) / 100;
+    const acc1 = (1 + z1) ** t1;
+    const acc2 = (1 + z2) ** t2;
+    const forward = ((acc2 / acc1) ** (1 / (t2 - t1))) - 1;
+    forwards.push(forward * 100);
+  }
+  return forwards;
+}
+
+function forwardCurveTraces(curves) {
+  const palette = [
+    { line: "#35c2ff", name: "A" },
+    { line: "#ffb000", name: "B" },
+    { line: "#ff6b6b", name: "C" },
+    { line: "#c792ea", name: "D" },
+    { line: "#7ae582", name: "E" },
+    { line: "#ffd166", name: "F" },
+  ];
+  return curves.map((curve, idx) => {
+    const colors = palette[idx % palette.length];
+    return {
+      x: curve.curveMonths.slice(1),
+      y: forwardCurveFromSpot(curve.estimated),
+      type: "scatter",
+      mode: "lines",
+      name: `${TEXT.forwardCurve} ${curve.date}`,
+      showlegend: true,
+      line: { color: colors.line, width: 2.5, dash: idx === 0 ? "solid" : "dash" },
+      hovertemplate: `${TEXT.date}: ${curve.date}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.forwardRate}: %{y:.2f}<extra></extra>`,
+    };
+  });
+}
+
+function runKalman() {
+  if (!state.rows.length) return;
+  const columns = selectedColumns("kf");
+  if (columns.length < 3) {
+    setStatus("kfStatus", TEXT.selectAtLeast3);
+    return;
+  }
+  const lambdaValue = Number(document.getElementById("kfLambda").value);
+  const result = fitDynamicNelsonSiegelKalman(state.rows, columns, lambdaValue);
+  const dates = availableDates(result.observed, result.columns);
+  if (!dates.length) {
+    setStatus("kfStatus", TEXT.noCompleteDates);
+    return;
+  }
+  state.calculations.kf = { ...result, lambdaValue, dates };
+  fillDateControls("kf", dates);
+  plotModel("kf");
+}
+
 function runNelsonSiegel() {
   if (!state.rows.length) return;
   const columns = selectedColumns("ns");
@@ -717,20 +788,19 @@ function plotProjection() {
     .filter(Boolean)
     .sort((a, b) => horizonOrder.indexOf(a) - horizonOrder.indexOf(b));
   const visibleProjectedEntries = horizonEntries.filter(item => activeHorizons.includes(item.label));
-  const forwardCurveFromSpot = curve => {
-    const forwards = [];
-    for (let m = 1; m < curve.length; m += 1) {
-      const t1 = m / 12;
-      const t2 = (m + 1) / 12;
-      const z1 = (curve[m - 1] || 0) / 100;
-      const z2 = (curve[m] || 0) / 100;
-      const acc1 = (1 + z1) ** t1;
-      const acc2 = (1 + z2) ** t2;
-      const forward = ((acc2 / acc1) ** (1 / (t2 - t1))) - 1;
-      forwards.push(forward * 100);
-    }
-    return forwards;
-  };
+  const curveTitle = document.getElementById("prCurveTitle");
+  const forwardTitle = document.getElementById("prForwardTitle");
+  const activeLabel = visibleProjectedEntries.length ? visibleProjectedEntries.map(item => item.label).join(" / ") : TEXT.currentLabel;
+  if (curveTitle) {
+    curveTitle.textContent = LANG === "en"
+      ? `Projected curves | base ${baseDate} | ${activeLabel}`
+      : `Curvas proyectadas | base ${baseDate} | ${activeLabel}`;
+  }
+  if (forwardTitle) {
+    forwardTitle.textContent = LANG === "en"
+      ? `Forward curves | base ${baseDate} | ${activeLabel}`
+      : `Curvas forward | base ${baseDate} | ${activeLabel}`;
+  }
   const forwardMonths = months.slice(1);
   const currentForwardCurve = forwardCurveFromSpot(currentCurve);
 
@@ -781,25 +851,27 @@ function plotProjection() {
         y: currentForwardCurve,
         type: "scatter",
         mode: "lines",
-        name: `${TEXT.currentCurvePrefix} ${baseDate}`,
+        name: `${TEXT.currentCurvePrefix} forward ${baseDate}`,
+        showlegend: true,
         line: { color: "#35c2ff", width: 3 },
-        hovertemplate: `${TEXT.currentCurvePrefix}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.forwardRate}: %{y:.2f}<extra></extra>`,
+        hovertemplate: `${TEXT.currentCurvePrefix} forward<br>${TEXT.date}: ${baseDate}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.forwardRate}: %{y:.2f}<extra></extra>`,
       },
       ...visibleProjectedEntries.map((item, index) => ({
         x: forwardMonths,
         y: forwardCurveFromSpot(item.curve),
         type: "scatter",
         mode: "lines",
-        name: `${TEXT.projectedCurvePrefix} ${item.label}`,
+        name: `${TEXT.projectedCurvePrefix} forward ${item.label} | ${baseDate}`,
+        showlegend: true,
         line: {
           color: ["#ffb000", "#ff6b6b", "#c792ea", "#7ae582"][index % 4],
           width: 2.75,
           dash: "dash",
         },
-        hovertemplate: `${TEXT.projectedCurvePrefix}<br>${TEXT.horizon}: ${item.label}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.forwardRate}: %{y:.2f}<extra></extra>`,
+        hovertemplate: `${TEXT.projectedCurvePrefix} forward<br>${TEXT.date}: ${baseDate}<br>${TEXT.horizon}: ${item.label}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.forwardRate}: %{y:.2f}<extra></extra>`,
       })),
     ],
-    { ...plotLayout(TEXT.maturityMonths, TEXT.forwardCurve), hovermode: "closest" },
+    { ...plotLayout(TEXT.maturityMonths, TEXT.forwardCurve), hovermode: "closest", showlegend: true, xaxis: { title: TEXT.maturityMonths, range: [1, 120], gridcolor: "#223548", zerolinecolor: "#223548" } },
     { responsive: true, displayModeBar: false },
   );
 
@@ -872,6 +944,40 @@ function plotProjection() {
 
 function plotModel(key) {
   if (!state.calculations[key]) return;
+  if (key === "kf") {
+    const calc = state.calculations.kf;
+    const curveDates = buildCurveSelection("kf");
+    if (!curveDates.length) return;
+    const months = Array.from({ length: 120 }, (_, i) => i + 1);
+    const curves = curveDates.map(date => {
+      const row = calc.observed.find(item => item.Date === date);
+      const beta = calc.betas.find(item => item.Date === date);
+      return {
+        date,
+        curveMonths: months,
+        estimated: reconstructNelsonSiegelCurve(months, beta, calc.lambdaValue),
+        observedMonths: calc.columns.map(column => RATE_MONTHS[column]),
+        observed: calc.columns.map(column => row[column]),
+      };
+    });
+    Plotly.newPlot("kfCurveChart", curveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.rate), hovermode: "closest" }, { responsive: true, displayModeBar: false });
+    Plotly.newPlot("kfForwardChart", forwardCurveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.forwardCurve), hovermode: "closest", showlegend: true }, { responsive: true, displayModeBar: false });
+    const forwardRows = [];
+    curves.forEach(curve => {
+      const forwardCurve = forwardCurveFromSpot(curve.estimated);
+      curve.curveMonths.slice(1).forEach((month, index) => {
+        forwardRows.push({ Date: curve.date, MaturityMonths: month, ForwardRate: forwardCurve[index] });
+      });
+    });
+    setDownloadLink("kfForwardDownload", forwardRows);
+    const curveRows = [];
+    curves.forEach(curve => {
+      curve.curveMonths.forEach((month, index) => curveRows.push({ Date: curve.date, MaturityMonths: month, EstimatedRate: curve.estimated[index] }));
+      curve.observedMonths.forEach((month, index) => curveRows.push({ Date: curve.date, MaturityMonths: month, ObservedRate: curve.observed[index] }));
+    });
+    setDownloadLink("kfCurvesDownload", curveRows);
+    setStatus("kfStatus", `${TEXT.chartUpdated} ${TEXT.kalmanProjection}.`);
+  }
   if (key === "ns") {
     const calc = state.calculations.ns;
     const curveDates = buildCurveSelection("ns");
@@ -888,14 +994,16 @@ function plotModel(key) {
         observed: calc.columns.map(column => row[column]),
       };
     });
-    const factors = [
-      { name: "level", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.level) },
-      { name: "slope", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.slope) },
-      { name: "curvature", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.curvature) },
-    ];
     Plotly.newPlot("nsCurveChart", curveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.rate), hovermode: "closest" }, { responsive: true, displayModeBar: false });
-    Plotly.newPlot("nsFactorChart", factorTraces(factors), { ...plotLayout(TEXT.date, TEXT.factor), hovermode: "x unified" }, { responsive: true, displayModeBar: false });
-    setDownloadLink("nsBetasDownload", calc.betas);
+    Plotly.newPlot("nsFactorChart", forwardCurveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.forwardCurve), hovermode: "closest", showlegend: true }, { responsive: true, displayModeBar: false });
+    const forwardRows = [];
+    curves.forEach(curve => {
+      const forwardCurve = forwardCurveFromSpot(curve.estimated);
+      curve.curveMonths.slice(1).forEach((month, index) => {
+        forwardRows.push({ Date: curve.date, MaturityMonths: month, ForwardRate: forwardCurve[index] });
+      });
+    });
+    setDownloadLink("nsBetasDownload", forwardRows);
     const curveRows = [];
     curves.forEach(curve => {
       curve.curveMonths.forEach((month, index) => curveRows.push({ Date: curve.date, MaturityMonths: month, EstimatedRate: curve.estimated[index] }));
@@ -920,15 +1028,16 @@ function plotModel(key) {
         observed: calc.columns.map(column => row[column]),
       };
     });
-    const factors = [
-      { name: "level", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.level) },
-      { name: "slope", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.slope) },
-      { name: "curv_1", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.curvature_1) },
-      { name: "curv_2", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.curvature_2) },
-    ];
     Plotly.newPlot("svCurveChart", curveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.rate), hovermode: "closest" }, { responsive: true, displayModeBar: false });
-    Plotly.newPlot("svFactorChart", factorTraces(factors), { ...plotLayout(TEXT.date, TEXT.factor), hovermode: "x unified" }, { responsive: true, displayModeBar: false });
-    setDownloadLink("svBetasDownload", calc.betas);
+    Plotly.newPlot("svFactorChart", forwardCurveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.forwardCurve), hovermode: "closest", showlegend: true }, { responsive: true, displayModeBar: false });
+    const forwardRows = [];
+    curves.forEach(curve => {
+      const forwardCurve = forwardCurveFromSpot(curve.estimated);
+      curve.curveMonths.slice(1).forEach((month, index) => {
+        forwardRows.push({ Date: curve.date, MaturityMonths: month, ForwardRate: forwardCurve[index] });
+      });
+    });
+    setDownloadLink("svBetasDownload", forwardRows);
     const curveRows = [];
     curves.forEach(curve => {
       curve.curveMonths.forEach((month, index) => curveRows.push({ Date: curve.date, MaturityMonths: month, EstimatedRate: curve.estimated[index] }));
@@ -1045,6 +1154,7 @@ try {
     });
   });
   document.getElementById("nsLambda")?.addEventListener("change", runNelsonSiegel);
+  document.getElementById("kfLambda")?.addEventListener("change", runKalman);
   document.getElementById("prLambda")?.addEventListener("change", runProjection);
   document.getElementById("prHorizon")?.addEventListener("change", event => {
     const value = event.target.value;

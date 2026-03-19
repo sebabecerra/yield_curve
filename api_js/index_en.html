@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Yield Curve Workstation</title>
-  <link rel="stylesheet" href="./css/styles.css" />
+  <link rel="stylesheet" href="./css/styles.css?v=20260319b" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
@@ -32,6 +32,7 @@
         <button class="tab active" data-panel="modelo">Overview</button>
         <button class="tab" data-panel="datos">Data</button>
         <button class="tab" data-panel="nelson-siegel">Nelson-Siegel</button>
+        <button class="tab" data-panel="kalman">Kalman</button>
         <button class="tab" data-panel="svensson">Svensson</button>
         <button class="tab" data-panel="cubic-spline">Cubic spline</button>
         <button class="tab" data-panel="proyeccion">Projection</button>
@@ -116,6 +117,14 @@
             <li><code>1M</code>, <code>3M</code>, <code>6M</code> and <code>12M</code> horizons are approximated with daily market steps</li>
             <li>the forward curve is rebuilt from the expected betas at the selected horizon</li>
           </ul>
+
+          <h3>Dynamic Nelson-Siegel with Kalman</h3>
+          <p>The <code>Kalman</code> tab keeps the Nelson-Siegel measurement structure but treats the factors as latent states and smooths them over time with a Kalman filter and smoother.</p>
+          <ul>
+            <li>the measurement equation maps Nelson-Siegel loadings into the observed yield cross-section</li>
+            <li>the transition equation uses a diagonal <code>AR(1)</code> persistence as a parsimonious baseline</li>
+            <li>the output is a filtered spot curve and a consistent filtered forward curve for each date</li>
+          </ul>
         </div>
       </section>
 
@@ -195,17 +204,76 @@
           <div class="model-charts">
             <div class="chart-panel">
               <div class="chart-toolbar">
-                <div class="chart-title">Estimated factors</div>
-                <a class="btn btn-ghost hidden-download" id="nsBetasDownload" href="#" download="nelson_siegel_betas.csv">Download betas</a>
-              </div>
-              <div id="nsFactorChart" class="chart"></div>
-            </div>
-            <div class="chart-panel">
-              <div class="chart-toolbar">
-                <div class="chart-title">Fitted curves</div>
+                <div class="chart-title">Curves</div>
                 <a class="btn btn-ghost hidden-download" id="nsCurvesDownload" href="#" download="nelson_siegel_curves.csv">Download curves</a>
               </div>
               <div id="nsCurveChart" class="chart"></div>
+            </div>
+            <div class="chart-panel">
+              <div class="chart-toolbar">
+                <div class="chart-title">Forward curves</div>
+                <a class="btn btn-ghost hidden-download" id="nsBetasDownload" href="#" download="nelson_siegel_forwards.csv">Download forward</a>
+              </div>
+              <div id="nsFactorChart" class="chart"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-kalman">
+        <h2 class="panel-title">Dynamic Nelson-Siegel with Kalman filter</h2>
+        <div class="model-layout">
+          <div class="model-sidebar">
+            <div class="field">
+              <label>Curve inputs</label>
+              <div id="kfColumns" class="chip-grid"></div>
+            </div>
+            <div class="field">
+              <label>Lambda</label>
+              <input id="kfLambda" type="number" step="0.0001" value="0.0609" />
+            </div>
+            <div class="field">
+              <label>Base date</label>
+              <div class="date-builder">
+                <select id="kfBaseYear"></select>
+                <select id="kfBaseMonth"></select>
+                <select id="kfBaseDay"></select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Comparison dates</label>
+              <div class="date-builder">
+                <select id="kfCompareYear"></select>
+                <select id="kfCompareMonth"></select>
+                <select id="kfCompareDay"></select>
+              </div>
+              <div class="preset-row">
+                <button class="preset-btn" type="button" data-model="kf" data-offset="1m">-1M</button>
+                <button class="preset-btn" type="button" data-model="kf" data-offset="3m">-3M</button>
+                <button class="preset-btn" type="button" data-model="kf" data-offset="1y">-1Y</button>
+              </div>
+              <div id="kfCompareDates" class="chip-grid compact"></div>
+            </div>
+            <div class="field">
+              <label>Assumption</label>
+              <div class="assumption-box">Latent Nelson-Siegel factors are filtered and smoothed through time with a linear state-space system. The transition uses a diagonal AR(1) persistence as a parsimonious baseline.</div>
+            </div>
+            <div class="status model-status" id="kfStatus"></div>
+          </div>
+          <div class="model-charts">
+            <div class="chart-panel">
+              <div class="chart-toolbar">
+                <div class="chart-title">Filtered curves</div>
+                <a class="btn btn-ghost hidden-download" id="kfCurvesDownload" href="#" download="kalman_curves.csv">Download curves</a>
+              </div>
+              <div id="kfCurveChart" class="chart"></div>
+            </div>
+            <div class="chart-panel">
+              <div class="chart-toolbar">
+                <div class="chart-title">Filtered forward curves</div>
+                <a class="btn btn-ghost hidden-download" id="kfForwardDownload" href="#" download="kalman_forwards.csv">Download forward</a>
+              </div>
+              <div id="kfForwardChart" class="chart"></div>
             </div>
           </div>
         </div>
@@ -255,14 +323,14 @@
           <div class="model-charts">
             <div class="chart-panel">
               <div class="chart-toolbar">
-                <div class="chart-title">Projected curves by horizon</div>
+                <div class="chart-title" id="prCurveTitle">Projected curves by horizon</div>
                 <a class="btn btn-ghost hidden-download" id="prCurvesDownload" href="#" download="projection_curves.csv">Download curves</a>
               </div>
               <div id="prCurveChart" class="chart"></div>
             </div>
             <div class="chart-panel">
               <div class="chart-toolbar">
-                <div class="chart-title">Forward curves by horizon</div>
+                <div class="chart-title" id="prForwardTitle">Forward curves by horizon (monthly maturity)</div>
                 <a class="btn btn-ghost hidden-download" id="prBetasDownload" href="#" download="projection_betas.csv">Download projection</a>
               </div>
               <div id="prFactorChart" class="chart"></div>
@@ -316,17 +384,17 @@
           <div class="model-charts">
             <div class="chart-panel">
               <div class="chart-toolbar">
-                <div class="chart-title">Estimated factors</div>
-                <a class="btn btn-ghost hidden-download" id="svBetasDownload" href="#" download="svensson_betas.csv">Download betas</a>
-              </div>
-              <div id="svFactorChart" class="chart"></div>
-            </div>
-            <div class="chart-panel">
-              <div class="chart-toolbar">
-                <div class="chart-title">Fitted curves</div>
+                <div class="chart-title">Curves</div>
                 <a class="btn btn-ghost hidden-download" id="svCurvesDownload" href="#" download="svensson_curves.csv">Download curves</a>
               </div>
               <div id="svCurveChart" class="chart"></div>
+            </div>
+            <div class="chart-panel">
+              <div class="chart-toolbar">
+                <div class="chart-title">Forward curves</div>
+                <a class="btn btn-ghost hidden-download" id="svBetasDownload" href="#" download="svensson_forwards.csv">Download forward</a>
+              </div>
+              <div id="svFactorChart" class="chart"></div>
             </div>
           </div>
         </div>
@@ -382,6 +450,6 @@
     </section>
   </div>
 
-  <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/app.js?v=20260319b"></script>
 </body>
 </html>

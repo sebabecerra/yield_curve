@@ -34,6 +34,57 @@ function multiplyMatrixVector(matrix, vector) {
   return matrix.map(row => row.reduce((sum, value, index) => sum + value * vector[index], 0));
 }
 
+function addMatrices(a, b) {
+  return a.map((row, i) => row.map((value, j) => value + b[i][j]));
+}
+
+function subtractMatrices(a, b) {
+  return a.map((row, i) => row.map((value, j) => value - b[i][j]));
+}
+
+function addVectors(a, b) {
+  return a.map((value, i) => value + b[i]);
+}
+
+function subtractVectors(a, b) {
+  return a.map((value, i) => value - b[i]);
+}
+
+function outerProduct(a, b) {
+  return a.map(valueA => b.map(valueB => valueA * valueB));
+}
+
+function identityMatrix(size) {
+  return Array.from({ length: size }, (_, i) =>
+    Array.from({ length: size }, (_, j) => (i === j ? 1 : 0)),
+  );
+}
+
+function diagonalMatrix(values) {
+  return values.map((value, i) =>
+    values.map((_, j) => (i === j ? value : 0)),
+  );
+}
+
+function addDiagonalJitter(matrix, epsilon = 1e-6) {
+  return matrix.map((row, i) =>
+    row.map((value, j) => (i === j ? value + epsilon : value)),
+  );
+}
+
+function inverseMatrix(matrix) {
+  const n = matrix.length;
+  return Array.from({ length: n }, (_, col) => {
+    const unit = Array.from({ length: n }, (_, row) => (row === col ? 1 : 0));
+    return solveLinearSystem(matrix.map(row => [...row]), unit);
+  }).reduce((acc, column, colIndex) => {
+    column.forEach((value, rowIndex) => {
+      acc[rowIndex][colIndex] = value;
+    });
+    return acc;
+  }, Array.from({ length: n }, () => Array(n).fill(0)));
+}
+
 function solveLinearSystem(matrix, vector) {
   const n = matrix.length;
   const augmented = matrix.map((row, i) => [...row, vector[i]]);
@@ -96,6 +147,138 @@ export function fitNelsonSiegel(rows, columns, lambdaValue) {
     return { Date: row.Date, level: beta[0], slope: beta[1], curvature: beta[2] };
   });
   return { observed, betas, columns: sortedColumns };
+}
+
+export function fitDynamicNelsonSiegelKalman(rows, columns, lambdaValue) {
+  const baseFit = fitNelsonSiegel(rows, columns, lambdaValue);
+  if (baseFit.observed.length < 5) {
+    throw new Error("Se necesitan al menos 5 fechas completas para Kalman.");
+  }
+
+  const tauYears = baseFit.columns.map(column => RATE_MONTHS[column] / 12);
+  const design = nelsonSiegelLoadings(tauYears, lambdaValue);
+  const olsBetas = baseFit.betas.map(beta => [beta.level, beta.slope, beta.curvature]);
+  const observedYields = baseFit.observed.map(row => baseFit.columns.map(column => row[column]));
+
+  const crossSectionResiduals = observedYields.map((y, index) => {
+    const fitted = evaluateDesign(design, olsBetas[index]);
+    return y.map((value, j) => value - fitted[j]);
+  });
+  const measurementVariances = baseFit.columns.map((_, columnIndex) => {
+    const values = crossSectionResiduals.map(row => row[columnIndex]);
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / Math.max(values.length - 1, 1);
+    return Math.max(variance, 1e-6);
+  });
+
+  const levelModel = fitAr1Series(baseFit.betas.map(beta => beta.level));
+  const slopeModel = fitAr1Series(baseFit.betas.map(beta => beta.slope));
+  const curvatureModel = fitAr1Series(baseFit.betas.map(beta => beta.curvature));
+  const transitionMatrix = diagonalMatrix([levelModel.phi, slopeModel.phi, curvatureModel.phi]);
+  const transitionIntercept = [levelModel.intercept, slopeModel.intercept, curvatureModel.intercept];
+  const stateCovariance = diagonalMatrix([
+    Math.max(levelModel.sigma ** 2, 1e-6),
+    Math.max(slopeModel.sigma ** 2, 1e-6),
+    Math.max(curvatureModel.sigma ** 2, 1e-6),
+  ]);
+  const measurementCovariance = diagonalMatrix(measurementVariances);
+
+  const betaMeans = [0, 1, 2].map(i => olsBetas.reduce((sum, beta) => sum + beta[i], 0) / olsBetas.length);
+  const initialCovariance = diagonalMatrix([0, 1, 2].map(i => {
+    const variance = olsBetas.reduce((sum, beta) => sum + ((beta[i] - betaMeans[i]) ** 2), 0) / Math.max(olsBetas.length - 1, 1);
+    return Math.max(variance, 1e-4);
+  }));
+
+  const identity = identityMatrix(3);
+  const filteredStates = [];
+  const filteredCovariances = [];
+  const predictedStates = [];
+  const predictedCovariances = [];
+
+  let currentState = [...olsBetas[0]];
+  let currentCovariance = initialCovariance;
+
+  observedYields.forEach(y => {
+    const predictedState = addVectors(
+      multiplyMatrixVector(transitionMatrix, currentState),
+      transitionIntercept,
+    );
+    const predictedCovariance = addMatrices(
+      multiply(multiply(transitionMatrix, currentCovariance), transpose(transitionMatrix)),
+      stateCovariance,
+    );
+    const innovation = subtractVectors(y, multiplyMatrixVector(design, predictedState));
+    const innovationCovariance = addDiagonalJitter(addMatrices(
+      multiply(multiply(design, predictedCovariance), transpose(design)),
+      measurementCovariance,
+    ));
+    const kalmanGain = multiply(
+      multiply(predictedCovariance, transpose(design)),
+      inverseMatrix(innovationCovariance),
+    );
+    const filteredState = addVectors(
+      predictedState,
+      multiplyMatrixVector(kalmanGain, innovation),
+    );
+    const filteredCovariance = multiply(
+      subtractMatrices(identity, multiply(kalmanGain, design)),
+      predictedCovariance,
+    );
+
+    predictedStates.push(predictedState);
+    predictedCovariances.push(predictedCovariance);
+    filteredStates.push(filteredState);
+    filteredCovariances.push(filteredCovariance);
+
+    currentState = filteredState;
+    currentCovariance = filteredCovariance;
+  });
+
+  const smoothedStates = [...filteredStates];
+  const smoothedCovariances = [...filteredCovariances];
+  for (let t = filteredStates.length - 2; t >= 0; t -= 1) {
+    const smootherGain = multiply(
+      multiply(filteredCovariances[t], transpose(transitionMatrix)),
+      inverseMatrix(predictedCovariances[t + 1]),
+    );
+    smoothedStates[t] = addVectors(
+      filteredStates[t],
+      multiplyMatrixVector(
+        smootherGain,
+        subtractVectors(smoothedStates[t + 1], predictedStates[t + 1]),
+      ),
+    );
+    smoothedCovariances[t] = addMatrices(
+      filteredCovariances[t],
+      multiply(
+        multiply(
+          smootherGain,
+          subtractMatrices(smoothedCovariances[t + 1], predictedCovariances[t + 1]),
+        ),
+        transpose(smootherGain),
+      ),
+    );
+  }
+
+  const betas = baseFit.observed.map((row, index) => ({
+    Date: row.Date,
+    level: smoothedStates[index][0],
+    slope: smoothedStates[index][1],
+    curvature: smoothedStates[index][2],
+  }));
+
+  return {
+    observed: baseFit.observed,
+    columns: baseFit.columns,
+    betas,
+    olsBetas: baseFit.betas,
+    transition: {
+      intercept: transitionIntercept,
+      phi: [levelModel.phi, slopeModel.phi, curvatureModel.phi],
+      sigma: [levelModel.sigma, slopeModel.sigma, curvatureModel.sigma],
+    },
+    measurementVariances,
+  };
 }
 
 export function fitSvensson(rows, columns, lambda1, lambda2) {
