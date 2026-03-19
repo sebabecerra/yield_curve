@@ -122,7 +122,7 @@ Flujo:
 3. pega el contenido de `api_js/google_apps_script.gs`
 4. despliega como `Web app`
 5. copia la URL pública del script
-6. pégala en `api_js/config.js`:
+6. pega la URL pública del script en `api_js/config.js`:
 
 ```js
 window.YC_ACCESS_LOG_URL = "TU_URL_DE_APPS_SCRIPT";
