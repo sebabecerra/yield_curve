@@ -9,7 +9,6 @@ import {
 } from "./models.js";
 import { MARKET_ROWS } from "../data/market_rows.js";
 
-const DEFAULT_COLUMNS = ["SPC_2Y", "SPC_3Y", "SPC_4Y", "SPC_5Y", "SPC_10Y"];
 const LANG = document.documentElement.lang?.toLowerCase().startsWith("en") ? "en" : "es";
 const ACCESS_STORAGE_KEY = "yield_curve_access_email";
 const I18N = {
@@ -285,7 +284,7 @@ function createColumnChips() {
     columns.forEach(column => {
       const chip = document.createElement("button");
       chip.type = "button";
-      chip.className = `chip ${DEFAULT_COLUMNS.includes(column) ? "active" : ""}`.trim();
+      chip.className = "chip active";
       chip.dataset.value = column;
       chip.textContent = column;
       chip.addEventListener("click", () => {
@@ -446,8 +445,7 @@ function fillDateControls(key, dates) {
 function initializeAllDateControls(rows) {
   const allColumns = availableColumns(rows);
   Object.keys(modelConfigs).forEach(key => {
-    const fallbackColumns = key === "sp" ? DEFAULT_COLUMNS : DEFAULT_COLUMNS;
-    const usableColumns = fallbackColumns.filter(column => allColumns.includes(column));
+    const usableColumns = allColumns;
     const dates = availableDates(rows, usableColumns);
     fillDateControls(key, dates);
   });
@@ -481,6 +479,12 @@ function plotLayout(xTitle, yTitle) {
     margin: { l: 54, r: 20, t: 18, b: 52 },
     font: { color: "#dde7f1", family: "Space Grotesk, sans-serif" },
     legend: { orientation: "h", x: 0, y: 1.08, bgcolor: "rgba(0,0,0,0)" },
+    hoverlabel: {
+      bgcolor: "#090d12",
+      bordercolor: "#3a2c12",
+      font: { color: "#dde7f1", family: "IBM Plex Mono, monospace", size: 12 },
+      align: "left",
+    },
     xaxis: { title: xTitle, range: isMaturityAxis ? [-5, 125] : undefined, gridcolor: "#223548", zerolinecolor: "#223548" },
     yaxis: { title: yTitle, gridcolor: "#223548", zerolinecolor: "#223548" },
   };
@@ -496,15 +500,40 @@ function curveTraces(curves) {
   const traces = [];
   curves.forEach((curve, idx) => {
     const colors = palette[idx % palette.length];
-    traces.push({ x: curve.curveMonths, y: curve.estimated, type: "scatter", mode: "lines", name: `${TEXT.estimatedPrefix} ${curve.date}`, line: { color: colors.line, width: 3 } });
-    traces.push({ x: curve.observedMonths, y: curve.observed, type: "scatter", mode: "lines+markers", name: `${TEXT.observedPrefix} ${curve.date}`, line: { color: colors.point, width: 1.5, dash: "dot" }, marker: { color: colors.point, size: 9, line: { color: "#081018", width: 1 } } });
+    traces.push({
+      x: curve.curveMonths,
+      y: curve.estimated,
+      type: "scatter",
+      mode: "lines",
+      name: `${TEXT.estimatedPrefix} ${curve.date}`,
+      line: { color: colors.line, width: 3 },
+      hovertemplate: `${TEXT.estimatedPrefix}<br>${TEXT.date}: ${curve.date}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.rate}: %{y:.2f}<extra></extra>`,
+    });
+    traces.push({
+      x: curve.observedMonths,
+      y: curve.observed,
+      type: "scatter",
+      mode: "lines+markers",
+      name: `${TEXT.observedPrefix} ${curve.date}`,
+      line: { color: colors.point, width: 1.5, dash: "dot" },
+      marker: { color: colors.point, size: 9, line: { color: "#081018", width: 1 } },
+      hovertemplate: `${TEXT.observedPrefix}<br>${TEXT.date}: ${curve.date}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.rate}: %{y:.2f}<extra></extra>`,
+    });
   });
   return traces;
 }
 
 function factorTraces(factors) {
   const colors = ["#ffb000", "#35c2ff", "#ffd166", "#7ae582"];
-  return factors.map((factor, index) => ({ x: factor.dates, y: factor.values, type: "scatter", mode: "lines", name: factor.name, line: { color: colors[index % colors.length], width: 2 } }));
+  return factors.map((factor, index) => ({
+    x: factor.dates,
+    y: factor.values,
+    type: "scatter",
+    mode: "lines",
+    name: factor.name,
+    line: { color: colors[index % colors.length], width: 2 },
+    hovertemplate: `${factor.name}<br>${TEXT.date}: %{x}<br>${TEXT.factor}: %{y:.2f}<extra></extra>`,
+  }));
 }
 
 function runNelsonSiegel() {
@@ -593,8 +622,8 @@ function plotModel(key) {
       { name: "slope", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.slope) },
       { name: "curvature", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.curvature) },
     ];
-    Plotly.newPlot("nsCurveChart", curveTraces(curves), plotLayout(TEXT.maturityMonths, TEXT.rate), { responsive: true, displayModeBar: false });
-    Plotly.newPlot("nsFactorChart", factorTraces(factors), plotLayout(TEXT.date, TEXT.factor), { responsive: true, displayModeBar: false });
+    Plotly.newPlot("nsCurveChart", curveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.rate), hovermode: "closest" }, { responsive: true, displayModeBar: false });
+    Plotly.newPlot("nsFactorChart", factorTraces(factors), { ...plotLayout(TEXT.date, TEXT.factor), hovermode: "x unified" }, { responsive: true, displayModeBar: false });
     setDownloadLink("nsBetasDownload", calc.betas);
     const curveRows = [];
     curves.forEach(curve => {
@@ -626,8 +655,8 @@ function plotModel(key) {
       { name: "curv_1", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.curvature_1) },
       { name: "curv_2", dates: calc.betas.map(beta => beta.Date), values: calc.betas.map(beta => beta.curvature_2) },
     ];
-    Plotly.newPlot("svCurveChart", curveTraces(curves), plotLayout(TEXT.maturityMonths, TEXT.rate), { responsive: true, displayModeBar: false });
-    Plotly.newPlot("svFactorChart", factorTraces(factors), plotLayout(TEXT.date, TEXT.factor), { responsive: true, displayModeBar: false });
+    Plotly.newPlot("svCurveChart", curveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.rate), hovermode: "closest" }, { responsive: true, displayModeBar: false });
+    Plotly.newPlot("svFactorChart", factorTraces(factors), { ...plotLayout(TEXT.date, TEXT.factor), hovermode: "x unified" }, { responsive: true, displayModeBar: false });
     setDownloadLink("svBetasDownload", calc.betas);
     const curveRows = [];
     curves.forEach(curve => {
@@ -655,7 +684,7 @@ function plotModel(key) {
         observed,
       };
     });
-    Plotly.newPlot("spCurveChart", curveTraces(curves), plotLayout(TEXT.maturityMonths, TEXT.rate), { responsive: true, displayModeBar: false });
+    Plotly.newPlot("spCurveChart", curveTraces(curves), { ...plotLayout(TEXT.maturityMonths, TEXT.rate), hovermode: "closest" }, { responsive: true, displayModeBar: false });
     const obsTraces = curves.map(curve => ({
       x: curve.observedMonths,
       y: curve.observed,
@@ -665,7 +694,7 @@ function plotModel(key) {
       line: { color: "#ffd166", width: 1.5, dash: "dot" },
       marker: { color: "#ffd166", size: 9, line: { color: "#081018", width: 1 } },
     }));
-    Plotly.newPlot("spObsChart", obsTraces, plotLayout(TEXT.maturityMonths, TEXT.observedRate), { responsive: true, displayModeBar: false });
+    Plotly.newPlot("spObsChart", obsTraces, { ...plotLayout(TEXT.maturityMonths, TEXT.observedRate), hovermode: "closest" }, { responsive: true, displayModeBar: false });
     const curveRows = [];
     curves.forEach(curve => {
       curve.curveMonths.forEach((month, index) => curveRows.push({ Date: curve.date, MaturityMonths: month, EstimatedRate: curve.estimated[index] }));
@@ -691,10 +720,10 @@ function setRows(rows) {
   renderDataTable();
   createColumnChips();
   initializeAllDateControls(rows);
-  const completeDefaultDates = availableDates(rows, DEFAULT_COLUMNS);
+  const completeAllDates = availableDates(rows, availableColumns(rows));
   const firstDate = rows[0]?.Date || "-";
   const lastDate = rows[rows.length - 1]?.Date || "-";
-  setGlobalStatus(TEXT.loadedBase(rows.length, firstDate, lastDate, completeDefaultDates.length));
+  setGlobalStatus(TEXT.loadedBase(rows.length, firstDate, lastDate, completeAllDates.length));
 }
 
 function loadEmbeddedMarketData() {
