@@ -1,21 +1,71 @@
-# yield_curve
+# Yield Curve Analytics
 
-Repositorio para construir, probar y publicar distintas versiones de una app de curvas de tasas basada en la lógica de los notebooks del proyecto.
+Plataforma estática para visualizar, comparar y descargar curvas de tasas a partir de una base de mercado ya incorporada en la aplicación.
 
-## Ruta activa
+La versión activa del proyecto está diseñada para:
 
-La version activa para publicacion en GitHub Pages es:
+- ejecutarse 100% en navegador
+- publicarse directamente en GitHub Pages
+- operar sin backend
+- mostrar curvas ajustadas con metodología financiera real
+- ofrecer una experiencia bilingüe en español e inglés
+
+## Qué resuelve
+
+Esta app transforma una base de tasas de mercado en una herramienta de análisis lista para uso ejecutivo, comercial y de monitoreo.
+
+Permite:
+
+- construir curvas de rendimiento con modelos reconocidos
+- comparar fechas de mercado de forma visual
+- revisar factores estimados en el tiempo
+- inspeccionar la base usada en la estimación
+- descargar curvas, betas y datos limpios
+
+En términos prácticos, sirve para mostrar:
+
+- cómo cambia el nivel de tasas
+- cómo cambia la pendiente de la curva
+- cómo cambia la curvatura
+- cómo se mueve la estructura temporal entre distintas fechas
+
+## Modelos incluidos
+
+La app incorpora tres enfoques de construcción de curva:
+
+- `Nelson-Siegel`
+- `Nelson-Siegel-Svensson`
+- `Cubic spline`
+
+Cada uno permite:
+
+- seleccionar las series de entrada
+- elegir una fecha base
+- agregar fechas comparativas
+- descargar los resultados
+
+## Propuesta de valor
+
+Esta versión está pensada para ser simple de operar y potente de presentar.
+
+Ventajas principales:
+
+- no depende de login BCCh ni de API externa en tiempo real
+- no requiere servidor Python para funcionar
+- puede publicarse como sitio estático
+- mantiene una base real ya integrada en la app
+- tiene interfaz en español e inglés
+- puede abrirse localmente o desplegarse en GitHub Pages
+
+## Ruta activa del proyecto
+
+La carpeta activa y oficial para la web pública es:
 
 - `api_js/`
 
-Esa carpeta contiene:
+Si vas a modificar la app que hoy se publica, trabaja solo ahí.
 
-- frontend estatico
-- calculo de modelos en JavaScript puro
-- base de mercado incrustada en el sitio
-- version en espanol e ingles
-
-Si vas a cambiar la web publica, trabaja solo en:
+Archivos principales:
 
 - `api_js/index.html`
 - `api_js/index_en.html`
@@ -23,8 +73,40 @@ Si vas a cambiar la web publica, trabaja solo en:
 - `api_js/js/app.js`
 - `api_js/js/models.js`
 - `api_js/data/market_rows.js`
+- `api_js/data/market_rates.csv`
 
-## Como probar la version activa
+## Estructura de la app activa
+
+```text
+api_js/
+  index.html
+  index_en.html
+  css/
+    styles.css
+  js/
+    app.js
+    models.js
+  data/
+    market_rows.js
+    market_rates.csv
+```
+
+## Datos
+
+La app usa una base real embebida.
+
+Archivos de datos:
+
+- `api_js/data/market_rows.js`: dataset que consume directamente la aplicación
+- `api_js/data/market_rates.csv`: versión tabular del mismo dataset
+
+Eso significa que la aplicación:
+
+- no pide cargar archivos al usuario
+- no necesita backend para estimar
+- puede correr completa desde GitHub Pages
+
+## Cómo probar localmente
 
 ```bash
 cd /Users/sbc/projects/yiled_curve/api_js
@@ -36,17 +118,17 @@ Luego abre:
 - `http://127.0.0.1:8080/index.html`
 - `http://127.0.0.1:8080/index_en.html`
 
-## Como publicar en GitHub Pages
+## Cómo se publica
 
-GitHub Pages se despliega por GitHub Actions usando:
+GitHub Pages se despliega automáticamente mediante:
 
 - `.github/workflows/deploy-pages.yml`
 
-Ese workflow publica la carpeta:
+Ese workflow publica:
 
 - `./api_js`
 
-Flujo normal:
+Flujo normal de publicación:
 
 ```bash
 cd /Users/sbc/projects/yiled_curve
@@ -55,51 +137,39 @@ git commit -m "update api_js"
 git push origin main
 ```
 
-Despues GitHub redeploya Pages automaticamente.
+Después de eso, GitHub Pages redeploya la aplicación automáticamente.
 
-URL publica:
+URL pública:
 
 - `https://sebabecerra.github.io/yield_curve/`
 
-## Carpetas del proyecto
+## Estado del repositorio
 
-Estas carpetas se mantienen, pero no todas son la version publica actual:
+El proyecto conserva versiones anteriores para no perder trabajo, pero no son la ruta principal actual.
 
-- `api_js/`: app estatica actual para GitHub Pages. Esta es la carpeta principal.
-- `old/docs/`: respaldo historico usado en despliegues anteriores de Pages.
-- `old/html/`: prototipo frontend estatico anterior.
-- `old/webapp/`: version web con backend Python y FastAPI.
-- `old/public_api/`: backend para base precargada y actualizacion privada de datos.
-- `old/yield_curve/`: motor Python original con calculos y utilidades.
-- `old/notebooks/`: notebooks de investigacion y preparacion.
-- `old/scripts/`: scripts auxiliares, incluyendo animaciones.
-- `old/sample_data/`: archivos de ejemplo.
-- `old/outputs/`: salidas generadas localmente.
-- `papers/`: archivos de trabajo locales.
+Todo lo histórico quedó agrupado en:
 
-## Datos de la version activa
+- `old/`
 
-La version `api_js/` usa una base incrustada.
+Ahí viven implementaciones anteriores como:
 
-Archivos relevantes:
+- `old/docs/`
+- `old/html/`
+- `old/webapp/`
+- `old/public_api/`
+- `old/yield_curve/`
+- `old/notebooks/`
+- `old/scripts/`
+- `old/sample_data/`
+- `old/outputs/`
+- `old/app.py`
 
-- `api_js/data/market_rows.js`: dataset embebido que consume la app.
-- `api_js/data/market_rates.csv`: version tabular legible de esa base.
+## Recomendación operativa
 
-## Otras versiones
+Para mantener el repo limpio:
 
-El repo mantiene versiones anteriores o alternativas para no perder trabajo:
-
-- Streamlit: `old/app.py`
-- FastAPI con frontend propio: `old/webapp/`
-- API publica con refresh privado: `old/public_api/`
-
-Esas rutas no se borran, pero no son la ruta principal actual para la web publica.
-
-## Recomendacion operativa
-
-Para evitar errores:
-
-- no uses `git add .` en este repo
-- usa `git add api_js` cuando cambies la web publica
+- no uses `git add .`
+- usa `git add api_js` cuando cambies la app pública
 - revisa `git status` antes de commitear
+- evita subir archivos pesados de trabajo local desde `papers/`
+
