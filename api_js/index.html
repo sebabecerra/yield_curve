@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Terminal de Analítica de la Curva de Tasas</title>
   <link rel="stylesheet" href="./css/styles.css?v=20260319b" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 </head>
 <body>
   <div class="shell">
@@ -36,6 +38,7 @@
         <button class="tab" data-panel="svensson">Svensson</button>
         <button class="tab" data-panel="cubic-spline">Cubic spline</button>
         <button class="tab" data-panel="proyeccion">Proyección</button>
+        <button class="tab" data-panel="paper">Paper</button>
       </div>
 
       <section class="panel active" id="panel-modelo">
@@ -78,7 +81,7 @@
           </ul>
           <div class="formula-block">
             <div class="formula-title">Fórmula</div>
-            <code>y(τ) = β1 + β2 * ((1 - e^(-λτ)) / (λτ)) + β3 * (((1 - e^(-λτ)) / (λτ)) - e^(-λτ))</code>
+            <div class="formula-render" data-math="y_t(\tau)=\beta_{1,t}+\beta_{2,t}\left(\frac{1-e^{-\lambda\tau}}{\lambda\tau}\right)+\beta_{3,t}\left(\frac{1-e^{-\lambda\tau}}{\lambda\tau}-e^{-\lambda\tau}\right)"></div>
           </div>
 
           <div class="model-label">Svensson</div>
@@ -89,7 +92,7 @@
           </ul>
           <div class="formula-block">
             <div class="formula-title">Fórmula</div>
-            <code>y(τ) = β1 + β2 L1(τ,λ1) + β3 C1(τ,λ1) + β4 C2(τ,λ2)</code>
+            <div class="formula-render" data-math="y_t(\tau)=\beta_{1,t}+\beta_{2,t}L_1(\tau,\lambda_1)+\beta_{3,t}C_1(\tau,\lambda_1)+\beta_{4,t}C_2(\tau,\lambda_2)"></div>
           </div>
 
           <div class="model-label">Cubic spline</div>
@@ -100,7 +103,8 @@
           </ul>
           <div class="formula-block">
             <div class="formula-title">Idea</div>
-            <code>s(τ)</code> interpola cada tramo entre nodos observados asegurando continuidad en nivel, pendiente y curvatura.
+            <div class="formula-render" data-math="s_i(\tau)=a_i+b_i(\tau-\tau_i)+c_i(\tau-\tau_i)^2+d_i(\tau-\tau_i)^3"></div>
+            <p>Interpola cada tramo entre nodos observados asegurando continuidad en nivel, pendiente y curvatura.</p>
           </div>
 
           <h3>Lectura ejecutiva de gráficos</h3>
@@ -125,6 +129,16 @@
             <li>la ecuación de transición usa una persistencia <code>AR(1)</code> por factor como aproximación simple</li>
             <li>el resultado entrega una curva spot filtrada y su curva forward consistente para cada fecha</li>
           </ul>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-paper">
+        <div class="paper-shell">
+          <div class="paper-toolbar">
+            <h2 class="panel-title">Paper técnico</h2>
+            <a class="btn btn-ghost" href="./paper.md" target="_blank" rel="noopener noreferrer">Abrir markdown</a>
+          </div>
+          <div class="paper-content copy-block" id="paperContent">Cargando paper...</div>
         </div>
       </section>
 

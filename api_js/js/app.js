@@ -92,6 +92,7 @@ const PROJECTION_HORIZONS = {
 };
 const state = {
   rows: [],
+  paperLoaded: false,
   availableDates: {
     kf: [],
     ns: [],
@@ -111,6 +112,193 @@ const state = {
 function setGlobalStatus(text) {
   const el = document.getElementById("globalStatus");
   if (el) el.textContent = text;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function renderMath(expr, displayMode = false) {
+  const source = String(expr).trim();
+  if (!source) return "";
+  if (window.katex?.renderToString) {
+    try {
+      return window.katex.renderToString(source, { throwOnError: false, displayMode });
+    } catch {
+      return `<code>${escapeHtml(source)}</code>`;
+    }
+  }
+  return `<code>${escapeHtml(source)}</code>`;
+}
+
+function renderStaticMathBlocks() {
+  document.querySelectorAll(".formula-render[data-math]").forEach(node => {
+    const expr = node.dataset.math || "";
+    node.innerHTML = renderMath(expr, true);
+  });
+}
+
+function renderInlineMarkdown(text) {
+  let html = escapeHtml(text);
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  html = html.replace(/\$([^$\n]+)\$/g, (_, expr) => renderMath(expr, false));
+  return html;
+}
+
+function markdownToHtml(markdown) {
+  const lines = markdown.split(/\r?\n/);
+  const html = [];
+  let inCodeBlock = false;
+  let codeBuffer = [];
+  let paragraphBuffer = [];
+  let listType = null;
+  let inMathBlock = false;
+  let mathBuffer = [];
+
+  function flushParagraph() {
+    if (!paragraphBuffer.length) return;
+    html.push(`<p>${renderInlineMarkdown(paragraphBuffer.join(" "))}</p>`);
+    paragraphBuffer = [];
+  }
+
+  function flushList() {
+    if (listType) {
+      html.push(`</${listType}>`);
+      listType = null;
+    }
+  }
+
+  function flushCode() {
+    if (!inCodeBlock) return;
+    html.push(`<pre class="paper-equation"><code>${escapeHtml(codeBuffer.join("\n"))}</code></pre>`);
+    codeBuffer = [];
+    inCodeBlock = false;
+  }
+
+  function flushMath() {
+    if (!inMathBlock) return;
+    html.push(`<div class="paper-math">${renderMath(mathBuffer.join("\n"), true)}</div>`);
+    mathBuffer = [];
+    inMathBlock = false;
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\t/g, "  ");
+    const trimmed = line.trim();
+
+    if (trimmed === "$$") {
+      flushParagraph();
+      flushList();
+      flushCode();
+      if (inMathBlock) {
+        flushMath();
+      } else {
+        inMathBlock = true;
+        mathBuffer = [];
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith("```")) {
+      flushParagraph();
+      flushList();
+      flushMath();
+      if (inCodeBlock) {
+        flushCode();
+      } else {
+        inCodeBlock = true;
+        codeBuffer = [];
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+      continue;
+    }
+
+    if (inMathBlock) {
+      mathBuffer.push(line);
+      continue;
+    }
+
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      flushMath();
+      continue;
+    }
+
+    if (trimmed === "---") {
+      flushParagraph();
+      flushList();
+      html.push("<hr />");
+      continue;
+    }
+
+    const headingMatch = trimmed.match(/^(#{1,4})\s+(.*)$/);
+    if (headingMatch) {
+      flushParagraph();
+      flushList();
+      const level = headingMatch[1].length;
+      html.push(`<h${level}>${renderInlineMarkdown(headingMatch[2])}</h${level}>`);
+      continue;
+    }
+
+    const orderedMatch = trimmed.match(/^\d+\.\s+(.*)$/);
+    if (orderedMatch) {
+      flushParagraph();
+      if (listType && listType !== "ol") flushList();
+      if (!listType) {
+        listType = "ol";
+        html.push("<ol>");
+      }
+      html.push(`<li>${renderInlineMarkdown(orderedMatch[1])}</li>`);
+      continue;
+    }
+
+    const unorderedMatch = trimmed.match(/^-\s+(.*)$/);
+    if (unorderedMatch) {
+      flushParagraph();
+      if (listType && listType !== "ul") flushList();
+      if (!listType) {
+        listType = "ul";
+        html.push("<ul>");
+      }
+      html.push(`<li>${renderInlineMarkdown(unorderedMatch[1])}</li>`);
+      continue;
+    }
+
+    flushList();
+    paragraphBuffer.push(trimmed);
+  }
+
+  flushParagraph();
+  flushList();
+  flushCode();
+  flushMath();
+  return html.join("\n");
+}
+
+async function loadPaper() {
+  if (state.paperLoaded) return;
+  const container = document.getElementById("paperContent");
+  if (!container) return;
+  try {
+    const response = await fetch("./paper.md?v=20260319c");
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const markdown = await response.text();
+    container.innerHTML = markdownToHtml(markdown);
+    state.paperLoaded = true;
+  } catch (error) {
+    container.innerHTML = `<p>${LANG === "en" ? "The paper could not be loaded." : "No se pudo cargar el paper."}</p>`;
+  }
 }
 
 const modelConfigs = {
@@ -135,6 +323,7 @@ function activatePanel(name) {
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.panel === name));
   document.querySelectorAll(".panel").forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
   try {
+    if (name === "paper") loadPaper();
     if (name === "kalman") runKalman();
     if (name === "nelson-siegel") runNelsonSiegel();
     if (name === "proyeccion") {
@@ -1128,6 +1317,7 @@ window.addEventListener("unhandledrejection", event => {
 });
 
 try {
+  renderStaticMathBlocks();
   document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => activatePanel(tab.dataset.panel)));
   document.querySelectorAll(".preset-btn").forEach(button => {
     button.addEventListener("click", () => {
