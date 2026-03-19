@@ -7,3 +7,11 @@ yield_curve/__pycache__/
 outputs/
 .DS_Store
 papers/*.csv
+papers/*.dmg
+papers/*.gif
+old/outputs/
+old/__pycache__/
+old/public_api/__pycache__/
+old/scripts/__pycache__/
+old/webapp/__pycache__/
+old/yield_curve/__pycache__/

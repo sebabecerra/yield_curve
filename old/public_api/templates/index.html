@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yield Curve Public</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050608;
+      --panel: rgba(9, 11, 14, 0.98);
+      --panel-2: rgba(6, 8, 10, 0.99);
+      --line: #262a31;
+      --line-strong: #3a2c12;
+      --text: #d8dde6;
+      --muted: #9aa3af;
+      --accent: #ffb000;
+      --shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #060709 0%, #040506 100%);
+      color: var(--text);
+      font-family: "Space Grotesk", sans-serif;
+    }
+    .shell {
+      max-width: 1720px;
+      margin: 0 auto;
+      padding: 16px 18px 24px;
+    }
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+    .hero, .main { padding: 20px 24px; }
+    .hero { margin-bottom: 14px; }
+    .eyebrow {
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .22em;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: "IBM Plex Mono", monospace;
+      margin-bottom: 10px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: .95;
+      letter-spacing: -.04em;
+    }
+    .hero-copy {
+      margin-top: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 960px;
+    }
+    .status {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      min-height: 20px;
+    }
+    .tabs {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .tab {
+      padding: 6px 0 10px;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      font-family: "IBM Plex Mono", monospace;
+      position: relative;
+    }
+    .tab.active { color: var(--text); }
+    .tab.active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -11px;
+      height: 2px;
+      background: var(--accent);
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .field input, .field select {
+      width: 100%;
+      background: #0a1118;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font: inherit;
+      outline: none;
+    }
+    .field input:focus, .field select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(255,176,0,.28);
+    }
+    .chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 6px;
+      background: #0a1118;
+      min-height: 56px;
+    }
+    .chip {
+      padding: 8px 12px;
+      border-radius: 4px;
+      border: 1px solid #50401c;
+      background: rgba(255,176,0,.04);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .chip.active {
+      background: rgba(255,176,0,.18);
+      color: #ffd166;
+      border-color: rgba(255,176,0,.52);
+    }
+    .btn {
+      border: 0;
+      border-radius: 4px;
+      padding: 12px 16px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: linear-gradient(180deg, #ffbf2f, #e19a00);
+      color: #111;
+    }
+    .btn-ghost {
+      background: #0b0d10;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .badges {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 8px 10px;
+      border-radius: 4px;
+      background: rgba(255,176,0,.04);
+      border: 1px solid var(--line-strong);
+    }
+    .compare-picker {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .compare-picker select {
+      flex: 1 1 180px;
+    }
+    .model-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 10px;
+    }
+    .chart-card-title {
+      margin: 0 0 10px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .chart {
+      width: 100%;
+      height: 520px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #090b0d;
+    }
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 6px;
+      background: #0a0f14;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 700;
+      background: #11161d;
+    }
+    .download-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 14px;
+    }
+    .hidden-download { visibility: hidden; }
+    @media (max-width: 1080px) {
+      .model-grid, .download-row { grid-template-columns: 1fr; }
+      .chart { height: 420px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="card hero">
+      <div class="eyebrow">Yield Curve Public</div>
+      <h1>Curvas publicas ya cargadas</h1>
+      <div class="hero-copy">
+        Esta version no pide credenciales. El backend mantiene una base previamente actualizada y la web publica solo calcula y grafica sobre esa base.
+      </div>
+      <div class="status" id="marketStatus">Cargando estado del mercado...</div>
+    </section>
+
+    <section class="card main">
+      <div class="tabs">
+        <div class="tab active" data-panel="modelo">Modelo</div>
+        <div class="tab" data-panel="datos">Datos</div>
+        <div class="tab" data-panel="nelson-siegel">Nelson-Siegel</div>
+        <div class="tab" data-panel="svensson">Svensson</div>
+        <div class="tab" data-panel="cubic-spline">Cubic spline</div>
+      </div>
+
+      <div class="panel active" id="panel-modelo">
+        <p style="color: var(--muted); line-height: 1.7; max-width: 940px;">
+          El administrador actualiza la base de BCCh por fuera de esta interfaz. Aqui solo eliges modelo, fechas y columnas para estimar y comparar curvas.
+        </p>
+      </div>
+
+      <div class="panel" id="panel-datos">
+        <div class="status" id="dataSummary">Esperando base cargada.</div>
+        <div class="table-wrap">
+          <table>
+            <thead id="dataHead"></thead>
+            <tbody id="dataBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-nelson-siegel">
+        <h2>Ajuste Nelson-Siegel clásico</h2>
+        <div class="field">
+          <label>Columnas para ajuste</label>
+          <div id="nsColumns" class="chip-grid"></div>
+        </div>
+        <div class="field">
+          <label>Lambda</label>
+          <input id="nsLambda" type="number" step="0.0001" value="0.0609" />
+        </div>
+        <div class="field">
+          <label>Fecha base</label>
+          <select id="nsBaseDate"></select>
+        </div>
+        <div class="field">
+          <label>Fechas a comparar</label>
+          <div class="compare-picker">
+            <select id="nsCompareYear"></select>
+            <select id="nsCompareMonth"></select>
+            <select id="nsCompareDay"></select>
+          </div>
+          <div id="nsCompareDates" class="chip-grid"></div>
+        </div>
+        <p class="status" id="nsStatus"></p>
+        <button class="btn btn-primary" id="nsRunBtn" disabled>Actualizar Nelson-Siegel</button>
+        <div class="toolbar">
+          <div class="badges">
+            <div class="badge" id="nsRows">Filas: -</div>
+            <div class="badge" id="nsCols">Series: -</div>
+          </div>
+        </div>
+        <div class="model-grid">
+          <div><div class="chart-card-title">Factores</div><div id="nsFactorChart" class="chart"></div></div>
+          <div><div class="chart-card-title">Curvas</div><div id="nsCurveChart" class="chart"></div></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-svensson">
+        <h2>Nelson-Siegel-Svensson</h2>
+        <div class="field">
+          <label>Columnas para Svensson</label>
+          <div id="svColumns" class="chip-grid"></div>
+        </div>
+        <div class="field">
+          <label>Lambda 1</label>
+          <input id="svLambda1" type="number" step="0.0001" value="0.0609" />
+        </div>
+        <div class="field">
+          <label>Lambda 2</label>
+          <input id="svLambda2" type="number" step="0.0001" value="0.2000" />
+        </div>
+        <div class="field">
+          <label>Fecha base</label>
+          <select id="svBaseDate"></select>
+        </div>
+        <div class="field">
+          <label>Fechas a comparar</label>
+          <div class="compare-picker">
+            <select id="svCompareYear"></select>
+            <select id="svCompareMonth"></select>
+            <select id="svCompareDay"></select>
+          </div>
+          <div id="svCompareDates" class="chip-grid"></div>
+        </div>
+        <p class="status" id="svStatus"></p>
+        <button class="btn btn-primary" id="svRunBtn" disabled>Actualizar Svensson</button>
+        <div class="toolbar">
+          <div class="badges">
+            <div class="badge" id="svRows">Filas: -</div>
+            <div class="badge" id="svCols">Series: -</div>
+          </div>
+        </div>
+        <div class="model-grid">
+          <div><div class="chart-card-title">Factores</div><div id="svFactorChart" class="chart"></div></div>
+          <div><div class="chart-card-title">Curvas</div><div id="svCurveChart" class="chart"></div></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-cubic-spline">
+        <h2>Cubic spline</h2>
+        <div class="field">
+          <label>Columnas para spline</label>
+          <div id="spColumns" class="chip-grid"></div>
+        </div>
+        <div class="field">
+          <label>Fecha base</label>
+          <select id="spBaseDate"></select>
+        </div>
+        <div class="field">
+          <label>Fechas a comparar</label>
+          <div class="compare-picker">
+            <select id="spCompareYear"></select>
+            <select id="spCompareMonth"></select>
+            <select id="spCompareDay"></select>
+          </div>
+          <div id="spCompareDates" class="chip-grid"></div>
+        </div>
+        <p class="status" id="spStatus"></p>
+        <button class="btn btn-primary" id="spRunBtn" disabled>Actualizar Cubic spline</button>
+        <div class="toolbar">
+          <div class="badges">
+            <div class="badge" id="spRows">Filas: -</div>
+            <div class="badge" id="spCols">Series: -</div>
+          </div>
+        </div>
+        <div class="model-grid">
+          <div><div class="chart-card-title">Curvas</div><div id="spCurveChart" class="chart"></div></div>
+          <div><div class="chart-card-title">Observadas</div><div id="spObsChart" class="chart"></div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const tabs = document.querySelectorAll(".tab");
+    const panels = document.querySelectorAll(".panel");
+    const state = {
+      market: null,
+      calculations: {
+        ns: null,
+        sv: null,
+        sp: null,
+      },
+    };
+    const configs = {
+      ns: { api: "nelson-siegel", cols: "nsColumns", base: "nsBaseDate", year: "nsCompareYear", month: "nsCompareMonth", day: "nsCompareDay", compare: "nsCompareDates", status: "nsStatus", rows: "nsRows", colsMeta: "nsCols", run: "nsRunBtn", curve: "nsCurveChart", factor: "nsFactorChart", lambda: "nsLambda" },
+      sv: { api: "svensson", cols: "svColumns", base: "svBaseDate", year: "svCompareYear", month: "svCompareMonth", day: "svCompareDay", compare: "svCompareDates", status: "svStatus", rows: "svRows", colsMeta: "svCols", run: "svRunBtn", curve: "svCurveChart", factor: "svFactorChart", lambda1: "svLambda1", lambda2: "svLambda2" },
+      sp: { api: "cubic-spline", cols: "spColumns", base: "spBaseDate", year: "spCompareYear", month: "spCompareMonth", day: "spCompareDay", compare: "spCompareDates", status: "spStatus", rows: "spRows", colsMeta: "spCols", run: "spRunBtn", curve: "spCurveChart", factor: "spObsChart" },
+    };
+
+    function activatePanel(name) {
+      tabs.forEach(tab => tab.classList.toggle("active", tab.dataset.panel === name));
+      panels.forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
+    }
+
+    async function readApiResponse(response, fallbackMessage) {
+      const rawText = await response.text();
+      let payload = null;
+      if (rawText) {
+        try {
+          payload = JSON.parse(rawText);
+        } catch {
+          throw new Error(rawText.trim() || fallbackMessage);
+        }
+      }
+      if (!response.ok) {
+        throw new Error(payload?.detail || fallbackMessage);
+      }
+      return payload;
+    }
+
+    function chartLayout(xTitle, yTitle) {
+      return {
+        paper_bgcolor: "#0b1016",
+        plot_bgcolor: "#0f1822",
+        margin: { l: 54, r: 20, t: 18, b: 52 },
+        font: { color: "#dde7f1", family: "Space Grotesk, sans-serif" },
+        legend: { orientation: "h", x: 0, y: 1.08, bgcolor: "rgba(0,0,0,0)" },
+        xaxis: { title: xTitle, range: xTitle.includes("Madurez") ? [-5, 125] : null, gridcolor: "#223548", zerolinecolor: "#223548" },
+        yaxis: { title: yTitle, gridcolor: "#223548", zerolinecolor: "#223548" }
+      };
+    }
+
+    function curveTraces(curves) {
+      const palette = [
+        { line: "#ffb000", point: "#ffd166" },
+        { line: "#35c2ff", point: "#7ae582" },
+        { line: "#ff6b6b", point: "#c7f464" },
+        { line: "#c792ea", point: "#82aaff" },
+      ];
+      const traces = [];
+      curves.forEach((curve, idx) => {
+        const colors = palette[idx % palette.length];
+        traces.push({ x: curve.curve_months, y: curve.estimated, type: "scatter", mode: "lines", name: `Estimada ${curve.date}`, line: { color: colors.line, width: 3 } });
+        traces.push({ x: curve.observed_months, y: curve.observed, type: "scatter", mode: "lines+markers", name: `Observada ${curve.date}`, line: { color: colors.point, width: 1.5, dash: "dot" }, marker: { color: colors.point, size: 9, line: { color: "#081018", width: 1 } } });
+      });
+      return traces;
+    }
+
+    function factorTraces(factors) {
+      const colors = ["#ffb000", "#35c2ff", "#ffd166", "#7ae582"];
+      return factors.map((factor, idx) => ({ x: factor.dates, y: factor.values, type: "scatter", mode: "lines", name: factor.name, line: { color: colors[idx % colors.length], width: 2 } }));
+    }
+
+    function renderTable(rows) {
+      const head = document.getElementById("dataHead");
+      const body = document.getElementById("dataBody");
+      head.innerHTML = "";
+      body.innerHTML = "";
+      if (!rows?.length) return;
+      const columns = Object.keys(rows[0]);
+      const headRow = document.createElement("tr");
+      columns.forEach(column => {
+        const th = document.createElement("th");
+        th.textContent = column;
+        headRow.appendChild(th);
+      });
+      head.appendChild(headRow);
+      rows.slice(0, 10).forEach(row => {
+        const tr = document.createElement("tr");
+        columns.forEach(column => {
+          const td = document.createElement("td");
+          td.textContent = typeof row[column] === "number" ? row[column].toFixed(4) : row[column];
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+    }
+
+    function selectedColumns(key) {
+      return [...document.querySelectorAll(`#${configs[key].cols} .chip.active`)].map(chip => chip.dataset.value);
+    }
+
+    function populateColumnChips(columns) {
+      ["ns", "sv", "sp"].forEach(key => {
+        const container = document.getElementById(configs[key].cols);
+        container.innerHTML = "";
+        columns.forEach(column => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "chip active";
+          chip.dataset.value = column;
+          chip.textContent = column;
+          chip.addEventListener("click", () => chip.classList.toggle("active"));
+          container.appendChild(chip);
+        });
+      });
+    }
+
+    function fillSelect(select, placeholder, values) {
+      select.innerHTML = "";
+      const first = document.createElement("option");
+      first.value = "";
+      first.textContent = placeholder;
+      first.selected = true;
+      select.appendChild(first);
+      values.forEach(value => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      });
+    }
+
+    function addCompareChip(modelKey, date) {
+      const container = document.getElementById(configs[modelKey].compare);
+      if ([...container.querySelectorAll(".chip")].some(chip => chip.dataset.value === date)) return;
+      if (container.querySelectorAll(".chip").length >= 5) return;
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip active";
+      chip.dataset.value = date;
+      chip.textContent = `${date} ×`;
+      chip.addEventListener("click", () => {
+        chip.remove();
+        if (state.calculations[modelKey]) plotModel(modelKey);
+      });
+      container.appendChild(chip);
+      if (state.calculations[modelKey]) plotModel(modelKey);
+    }
+
+    function populateDateSelectors(dates) {
+      Object.values(configs).forEach(config => {
+        const base = document.getElementById(config.base);
+        const year = document.getElementById(config.year);
+        const month = document.getElementById(config.month);
+        const day = document.getElementById(config.day);
+        const compare = document.getElementById(config.compare);
+        base.innerHTML = "";
+        compare.innerHTML = "";
+        dates.forEach((date, index) => {
+          const option = document.createElement("option");
+          option.value = date;
+          option.textContent = date;
+          if (index === dates.length - 1) option.selected = true;
+          base.appendChild(option);
+        });
+        fillSelect(year, "Año", [...new Set(dates.map(date => date.slice(0, 4)))]);
+        fillSelect(month, "Mes", []);
+        fillSelect(day, "Día", []);
+        year.onchange = () => {
+          const months = [...new Set(dates.filter(date => date.startsWith(year.value + "-")).map(date => date.slice(5, 7)))];
+          fillSelect(month, "Mes", months);
+          fillSelect(day, "Día", []);
+        };
+        month.onchange = () => {
+          const days = dates.filter(date => date.startsWith(`${year.value}-${month.value}-`)).map(date => date.slice(8, 10));
+          fillSelect(day, "Día", days);
+        };
+        day.onchange = () => {
+          if (year.value && month.value && day.value) {
+            addCompareChip(config.api === "nelson-siegel" ? "ns" : config.api === "svensson" ? "sv" : "sp", `${year.value}-${month.value}-${day.value}`);
+            day.value = "";
+          }
+        };
+      });
+    }
+
+    async function loadMarketStatus() {
+      const response = await fetch("/api/market/status");
+      const data = await readApiResponse(response, "No se pudo leer el estado del mercado.");
+      state.market = data;
+      document.getElementById("marketStatus").textContent = `Base cargada desde ${data.meta.start_date} hasta ${data.meta.end_date}. Filas: ${data.meta.rows_used}. Ultimo refresh: ${data.meta.last_refresh_utc || "sin dato"}.`;
+      document.getElementById("dataSummary").textContent = `Filas originales: ${data.meta.raw_row_count} | Filas usadas: ${data.meta.rows_used} | Filas eliminadas por NA: ${data.meta.removed_rows}`;
+      renderTable(data.meta.sample_rows);
+      populateColumnChips(data.meta.columns);
+      populateDateSelectors(data.meta.available_dates);
+      Object.values(configs).forEach(config => {
+        document.getElementById(config.run).disabled = false;
+      });
+    }
+
+    async function runModel(key) {
+      const status = document.getElementById(configs[key].status);
+      const columns = selectedColumns(key);
+      if (columns.length < 3) {
+        status.textContent = "Selecciona al menos 3 tasas.";
+        return;
+      }
+      status.textContent = "Calculando...";
+      const payload = { model: configs[key].api, columns };
+      if (key === "ns") payload.lambda_value = Number(document.getElementById("nsLambda").value);
+      if (key === "sv") {
+        payload.lambda1 = Number(document.getElementById("svLambda1").value);
+        payload.lambda2 = Number(document.getElementById("svLambda2").value);
+      }
+
+      const response = await fetch("/api/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await readApiResponse(response, "No se pudo calcular.");
+      state.calculations[key] = data;
+      document.getElementById(configs[key].rows).textContent = `Filas: ${data.meta.rows_used}`;
+      document.getElementById(configs[key].colsMeta).textContent = `Series: ${data.meta.columns.join(", ")}`;
+      populateDateSelectors(data.meta.available_dates);
+      await plotModel(key);
+    }
+
+    async function plotModel(key) {
+      const calc = state.calculations[key];
+      const status = document.getElementById(configs[key].status);
+      if (!calc) return;
+      const baseDate = document.getElementById(configs[key].base).value;
+      const compareDates = [...document.querySelectorAll(`#${configs[key].compare} .chip.active`)].map(chip => chip.dataset.value);
+      const response = await fetch("/api/plot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ calc_id: calc.calc_id, curve_dates: [baseDate, ...compareDates.filter(date => date !== baseDate)].slice(0, 6) }),
+      });
+      const data = await readApiResponse(response, "No se pudo graficar.");
+      Plotly.newPlot(configs[key].curve, curveTraces(data.curves), chartLayout("Madurez (meses)", "Tasa"), { responsive: true, displayModeBar: false });
+      if (data.factors.length) {
+        Plotly.newPlot(configs[key].factor, factorTraces(data.factors), chartLayout("Fecha", "Factor"), { responsive: true, displayModeBar: false });
+      } else {
+        const observedOnly = data.curves.map(curve => ({
+          x: curve.observed_months,
+          y: curve.observed,
+          type: "scatter",
+          mode: "lines+markers",
+          name: `Observada ${curve.date}`,
+          line: { color: "#ffd166", width: 1.5, dash: "dot" },
+          marker: { color: "#ffd166", size: 9, line: { color: "#081018", width: 1 } },
+        }));
+        Plotly.newPlot(configs[key].factor, observedOnly, chartLayout("Madurez (meses)", "Tasa observada"), { responsive: true, displayModeBar: false });
+      }
+      status.textContent = "Grafico actualizado.";
+    }
+
+    tabs.forEach(tab => tab.addEventListener("click", () => activatePanel(tab.dataset.panel)));
+    document.getElementById("nsRunBtn").addEventListener("click", () => runModel("ns"));
+    document.getElementById("svRunBtn").addEventListener("click", () => runModel("sv"));
+    document.getElementById("spRunBtn").addEventListener("click", () => runModel("sp"));
+    loadMarketStatus().catch(error => {
+      document.getElementById("marketStatus").textContent = error.message;
+    });
+  </script>
+</body>
+</html>

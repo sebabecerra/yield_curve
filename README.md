@@ -1,102 +1,105 @@
 # yield_curve
 
-App base para calcular y visualizar la yield curve a partir de la lógica que ya existe en los notebooks del proyecto.
+Repositorio para construir, probar y publicar distintas versiones de una app de curvas de tasas basada en la lógica de los notebooks del proyecto.
 
-## Qué incluye
+## Ruta activa
 
-- Ajuste Nelson-Siegel clásico para tasas observadas por fecha.
-- Ajuste discreto con `phi` calibrado por grilla, siguiendo la idea del notebook `MonitorAnimadoTasasdeInteresBCCh.ipynb`.
-- App en Streamlit para cargar un CSV, revisar factores y descargar resultados.
-- Descarga opcional desde BCCh usando usuario y contraseña del servicio.
-- Dataset demo y plantilla de entrada.
+La version activa para publicacion en GitHub Pages es:
 
-## Estructura
+- `api_js/`
 
-- `app.py`: interfaz Streamlit.
-- `yield_curve/core.py`: funciones de cálculo reutilizables.
-- `sample_data/demo_rates.csv`: ejemplo mínimo.
-- `sample_data/template_rates.csv`: plantilla para tus propios datos.
+Esa carpeta contiene:
 
-## Formato esperado del CSV
+- frontend estatico
+- calculo de modelos en JavaScript puro
+- base de mercado incrustada en el sitio
+- version en espanol e ingles
 
-Debe existir una columna `Date` y una o más columnas de tasas. El catálogo maestro quedó normalizado desde `notebooks/series_spc.json` y usa alias internos como:
+Si vas a cambiar la web publica, trabaja solo en:
 
-- `spc_pesos_2y`
-- `spc_pesos_3y`
-- `spc_pesos_4y`
-- `spc_pesos_5y`
-- `spc_pesos_10y`
-- `spc_uf_1y`
-- `spc_uf_2y`
-- `spc_uf_3y`
-- `spc_uf_4y`
-- `spc_uf_5y`
-- `spc_uf_10y`
-- `spc_uf_20y`
+- `api_js/index.html`
+- `api_js/index_en.html`
+- `api_js/css/styles.css`
+- `api_js/js/app.js`
+- `api_js/js/models.js`
+- `api_js/data/market_rows.js`
 
-Cada alias tiene asociado:
-
-- `label`: nombre legible
-- `code`: código BCCh
-- `months`: madurez en meses
-- `currency`: moneda o unidad (`CLP` o `UF`)
-
-## Ejecutar
+## Como probar la version activa
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-## Web App
-
-Version web real con backend Python:
-
-```bash
-uvicorn webapp.main:app --reload
+cd /Users/sbc/projects/yiled_curve/api_js
+python3 -m http.server 8080
 ```
 
 Luego abre:
 
-```text
-http://127.0.0.1:8000
-```
+- `http://127.0.0.1:8080/index.html`
+- `http://127.0.0.1:8080/index_en.html`
 
-## Generar animacion
+## Como publicar en GitHub Pages
 
-Puedes generar un GIF con la evolucion completa de las curvas:
+GitHub Pages se despliega por GitHub Actions usando:
 
-```bash
-python3 scripts/generate_curve_animation.py \
-  --source csv \
-  --csv-path sample_data/demo_rates.csv \
-  --start-date 2018-01-01 \
-  --end-date 2018-10-01 \
-  --model nelson-siegel \
-  --columns SPC_2Y SPC_3Y SPC_4Y SPC_5Y SPC_10Y \
-  --output outputs/curve_evolution.gif
-```
+- `.github/workflows/deploy-pages.yml`
 
-Tambien soporta `--source bcch` usando `--user` y `--password`.
+Ese workflow publica la carpeta:
 
-Tambien puedes usar variables de entorno:
+- `./api_js`
+
+Flujo normal:
 
 ```bash
-export BCCH_USER="tu_usuario"
-export BCCH_PASSWORD="tu_password"
+cd /Users/sbc/projects/yiled_curve
+git add api_js
+git commit -m "update api_js"
+git push origin main
 ```
 
-## Fuente de datos
+Despues GitHub redeploya Pages automaticamente.
 
-La app puede trabajar de tres maneras:
+URL publica:
 
-- `Demo`: usa un dataset sintético incluido en el repo.
-- `CSV`: carga un archivo local con columnas alineadas al catálogo.
-- `BCCh`: consulta directamente las series del catálogo usando tus credenciales del servicio `SieteRestWS`.
+- `https://sebabecerra.github.io/yield_curve/`
 
-## Notas
+## Carpetas del proyecto
 
-- La calibración automática de `phi` selecciona el valor con menor error cuadrático medio promedio entre meses.
-- La app no descarga datos de BCCh todavía; trabaja con CSV local o con el dataset demo.
+Estas carpetas se mantienen, pero no todas son la version publica actual:
+
+- `api_js/`: app estatica actual para GitHub Pages. Esta es la carpeta principal.
+- `old/docs/`: respaldo historico usado en despliegues anteriores de Pages.
+- `old/html/`: prototipo frontend estatico anterior.
+- `old/webapp/`: version web con backend Python y FastAPI.
+- `old/public_api/`: backend para base precargada y actualizacion privada de datos.
+- `old/yield_curve/`: motor Python original con calculos y utilidades.
+- `old/notebooks/`: notebooks de investigacion y preparacion.
+- `old/scripts/`: scripts auxiliares, incluyendo animaciones.
+- `old/sample_data/`: archivos de ejemplo.
+- `old/outputs/`: salidas generadas localmente.
+- `papers/`: archivos de trabajo locales.
+
+## Datos de la version activa
+
+La version `api_js/` usa una base incrustada.
+
+Archivos relevantes:
+
+- `api_js/data/market_rows.js`: dataset embebido que consume la app.
+- `api_js/data/market_rates.csv`: version tabular legible de esa base.
+
+## Otras versiones
+
+El repo mantiene versiones anteriores o alternativas para no perder trabajo:
+
+- Streamlit: `old/app.py`
+- FastAPI con frontend propio: `old/webapp/`
+- API publica con refresh privado: `old/public_api/`
+
+Esas rutas no se borran, pero no son la ruta principal actual para la web publica.
+
+## Recomendacion operativa
+
+Para evitar errores:
+
+- no uses `git add .` en este repo
+- usa `git add api_js` cuando cambies la web publica
+- revisa `git status` antes de commitear

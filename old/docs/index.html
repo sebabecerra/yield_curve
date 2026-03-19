@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analítica de la Curva de Rendimiento</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+  <div class="access-overlay" id="accessOverlay">
+    <div class="access-card">
+      <div class="eyebrow">Acceso</div>
+      <h2 class="access-title">Ingresa tu email</h2>
+      <p class="access-copy">
+        El acceso a la plataforma requiere un correo con formato válido. El registro queda guardado localmente en este navegador.
+      </p>
+      <div class="field">
+        <label for="accessEmail">Email</label>
+        <input id="accessEmail" type="email" placeholder="nombre@empresa.com" autocomplete="email" />
+      </div>
+      <button class="btn btn-primary access-btn" id="accessSubmit" type="button">Entrar a la plataforma</button>
+      <div class="status access-status" id="accessStatus"></div>
+    </div>
+  </div>
+  <div class="shell">
+    <section class="card hero">
+      <div class="hero-topline">
+        <div class="eyebrow">Terminal de Curvas</div>
+        <div class="hero-actions">
+          <div class="session-badge">
+            <span class="session-label">Sesión</span>
+            <span class="session-email" id="sessionEmail">-</span>
+            <button class="session-link" id="changeEmailBtn" type="button">Cerrar sesión</button>
+          </div>
+          <div class="lang-switch">
+          <a class="lang-link active" href="./index.html">ES</a>
+          <a class="lang-link" href="./index_en.html">EN</a>
+          </div>
+        </div>
+      </div>
+      <h1>Analítica de la Curva de Rendimiento</h1>
+      <p class="hero-copy">
+        Plataforma analítica de las curvas de Rendimiento con base de mercado incorporada, cálculo local y visualización inmediata de modelos de curva para uso ejecutivo, comercial y de monitoreo.
+      </p>
+    </section>
+
+    <section class="card main">
+      <div class="status" id="globalStatus">Cargando base incorporada...</div>
+
+      <div class="tabs">
+        <button class="tab active" data-panel="modelo">Modelo</button>
+        <button class="tab" data-panel="datos">Datos</button>
+        <button class="tab" data-panel="nelson-siegel">Nelson-Siegel</button>
+        <button class="tab" data-panel="svensson">Svensson</button>
+        <button class="tab" data-panel="cubic-spline">Cubic spline</button>
+      </div>
+
+      <section class="panel active" id="panel-modelo">
+        <div class="copy-block">
+          <h3>Qué hace la plataforma</h3>
+          <p>Esta versión estima curvas de tasas a partir de observaciones efectivas de mercado ya incorporadas en el sitio.</p>
+          <p>Integra tres enfoques complementarios de construcción de curva:</p>
+          <ul>
+            <li><code>Nelson-Siegel clásico</code>: ajusta factores <code>level</code>, <code>slope</code> y <code>curvature</code> por fecha.</li>
+            <li><code>Nelson-Siegel-Svensson</code>: extiende Nelson-Siegel con un segundo factor de curvatura.</li>
+            <li><code>Cubic spline</code>: interpola una curva suave directamente sobre los nodos observados.</li>
+          </ul>
+
+          <h3>Arquitectura de datos</h3>
+          <p>La plataforma opera únicamente con datos efectivos de mercado.</p>
+          <ul>
+            <li><code>Base incrustada</code>: usa una base real precargada dentro del sitio estático.</li>
+            <li><code>Aliases legacy</code>: nombres como <code>spc_pesos_2y</code> se normalizan a <code>SPC_2Y</code>.</li>
+          </ul>
+          <p>En esta edición, la base ya viene incorporada y el cálculo corre completo en el navegador, sin dependencia operativa de backend.</p>
+
+          <h3>Normalización y limpieza</h3>
+          <p>Antes de estimar, la plataforma:</p>
+          <ul>
+            <li>convierte <code>Date</code> a fecha usable</li>
+            <li>convierte las columnas de tasas a numéricas</li>
+            <li>deja como <code>NaN</code> los vacíos reales</li>
+            <li>usa solo fechas completas para las columnas seleccionadas</li>
+          </ul>
+          <p>Las curvas se calculan sobre el dataset limpio que ves en la pestaña <code>Datos</code>.</p>
+
+          <h3>Marco metodológico</h3>
+          <div class="model-label">Nelson-Siegel</div>
+          <ul>
+            <li>toma una sección transversal de tasas por fecha</li>
+            <li>construye las cargas de <code>level</code>, <code>slope</code> y <code>curvature</code></li>
+            <li>usa <code>lambda = 0.0609</code> fijo, siguiendo el notebook original</li>
+            <li>estima los betas por mínimos cuadrados</li>
+            <li>reconstruye una curva continua sobre la duración</li>
+          </ul>
+          <div class="formula-block">
+            <div class="formula-title">Fórmula</div>
+            <code>y(τ) = β1 + β2 * ((1 - e^(-λτ)) / (λτ)) + β3 * (((1 - e^(-λτ)) / (λτ)) - e^(-λτ))</code>
+          </div>
+
+          <div class="model-label">Svensson</div>
+          <ul>
+            <li>agrega un cuarto factor de curvatura</li>
+            <li>usa dos parámetros <code>lambda</code></li>
+            <li>estima betas por mínimos cuadrados</li>
+          </ul>
+          <div class="formula-block">
+            <div class="formula-title">Fórmula</div>
+            <code>y(τ) = β1 + β2 L1(τ,λ1) + β3 C1(τ,λ1) + β4 C2(τ,λ2)</code>
+          </div>
+
+          <div class="model-label">Cubic spline</div>
+          <ul>
+            <li>toma solo las tasas observadas disponibles</li>
+            <li>ajusta una interpolación cúbica natural</li>
+            <li>produce una curva suave sin factores latentes</li>
+          </ul>
+          <div class="formula-block">
+            <div class="formula-title">Idea</div>
+            <code>s(τ)</code> interpola cada tramo entre nodos observados asegurando continuidad en nivel, pendiente y curvatura.
+          </div>
+
+          <h3>Lectura ejecutiva de gráficos</h3>
+          <ul>
+            <li><code>Tasas observadas</code>: puntos efectivos disponibles en la fecha elegida.</li>
+            <li><code>Curva estimada</code>: línea ajustada por el modelo.</li>
+            <li><code>Factores</code>: evolución temporal de los parámetros estimados.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-datos">
+        <div class="status" id="dataSummary">Sin datos cargados.</div>
+        <div class="data-toolbar">
+          <div class="data-controls">
+            <label class="mini-field">
+              Ordenar por
+              <select id="dataSortColumn"></select>
+            </label>
+            <label class="mini-field">
+              Orden
+              <select id="dataSortDirection">
+                <option value="desc">Descendente</option>
+                <option value="asc">Ascendente</option>
+              </select>
+            </label>
+            <label class="mini-field">
+              Filas
+              <select id="dataRowLimit">
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+          </div>
+          <div class="download-actions">
+            <a class="btn btn-ghost hidden-download" id="dataDownload" href="#" download="market_rates.csv">Descargar datos</a>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead id="dataHead"></thead>
+            <tbody id="dataBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-nelson-siegel">
+        <h2 class="panel-title">Ajuste Nelson-Siegel clásico</h2>
+        <div class="field">
+          <label>Series usadas en la curva</label>
+          <div id="nsColumns" class="chip-grid"></div>
+        </div>
+        <div class="field">
+          <label>Lambda</label>
+          <input id="nsLambda" type="number" step="0.0001" value="0.0609" />
+        </div>
+        <div class="field">
+          <label>Fecha base</label>
+          <div class="date-builder">
+            <select id="nsBaseYear"></select>
+            <select id="nsBaseMonth"></select>
+            <select id="nsBaseDay"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Fechas a comparar</label>
+          <div class="date-builder">
+            <select id="nsCompareYear"></select>
+            <select id="nsCompareMonth"></select>
+            <select id="nsCompareDay"></select>
+          </div>
+          <div class="preset-row">
+            <button class="preset-btn" type="button" data-model="ns" data-offset="1m">-1M</button>
+            <button class="preset-btn" type="button" data-model="ns" data-offset="3m">-3M</button>
+            <button class="preset-btn" type="button" data-model="ns" data-offset="1y">-1Y</button>
+          </div>
+          <div id="nsCompareDates" class="chip-grid compact"></div>
+        </div>
+        <div class="status" id="nsStatus"></div>
+        <div class="model-grid">
+          <div>
+            <div class="chart-toolbar">
+              <div class="chart-title">Factores</div>
+              <a class="btn btn-ghost hidden-download" id="nsBetasDownload" href="#" download="nelson_siegel_betas.csv">Descargar betas</a>
+            </div>
+            <div id="nsFactorChart" class="chart"></div>
+          </div>
+          <div>
+            <div class="chart-toolbar">
+              <div class="chart-title">Curvas</div>
+              <a class="btn btn-ghost hidden-download" id="nsCurvesDownload" href="#" download="nelson_siegel_curves.csv">Descargar curvas</a>
+            </div>
+            <div id="nsCurveChart" class="chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-svensson">
+        <h2 class="panel-title">Nelson-Siegel-Svensson</h2>
+        <div class="field">
+          <label>Series usadas en la curva</label>
+          <div id="svColumns" class="chip-grid"></div>
+        </div>
+        <div class="field split">
+          <div>
+            <label>Lambda 1</label>
+            <input id="svLambda1" type="number" step="0.0001" value="0.0609" />
+          </div>
+          <div>
+            <label>Lambda 2</label>
+            <input id="svLambda2" type="number" step="0.0001" value="0.2000" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Fecha base</label>
+          <div class="date-builder">
+            <select id="svBaseYear"></select>
+            <select id="svBaseMonth"></select>
+            <select id="svBaseDay"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Fechas a comparar</label>
+          <div class="date-builder">
+            <select id="svCompareYear"></select>
+            <select id="svCompareMonth"></select>
+            <select id="svCompareDay"></select>
+          </div>
+          <div class="preset-row">
+            <button class="preset-btn" type="button" data-model="sv" data-offset="1m">-1M</button>
+            <button class="preset-btn" type="button" data-model="sv" data-offset="3m">-3M</button>
+            <button class="preset-btn" type="button" data-model="sv" data-offset="1y">-1Y</button>
+          </div>
+          <div id="svCompareDates" class="chip-grid compact"></div>
+        </div>
+        <div class="status" id="svStatus"></div>
+        <div class="model-grid">
+          <div>
+            <div class="chart-toolbar">
+              <div class="chart-title">Factores</div>
+              <a class="btn btn-ghost hidden-download" id="svBetasDownload" href="#" download="svensson_betas.csv">Descargar betas</a>
+            </div>
+            <div id="svFactorChart" class="chart"></div>
+          </div>
+          <div>
+            <div class="chart-toolbar">
+              <div class="chart-title">Curvas</div>
+              <a class="btn btn-ghost hidden-download" id="svCurvesDownload" href="#" download="svensson_curves.csv">Descargar curvas</a>
+            </div>
+            <div id="svCurveChart" class="chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="panel-cubic-spline">
+        <h2 class="panel-title">Cubic spline</h2>
+        <div class="field">
+          <label>Series usadas en la curva</label>
+          <div id="spColumns" class="chip-grid"></div>
+        </div>
+        <div class="field">
+          <label>Fecha base</label>
+          <div class="date-builder">
+            <select id="spBaseYear"></select>
+            <select id="spBaseMonth"></select>
+            <select id="spBaseDay"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Fechas a comparar</label>
+          <div class="date-builder">
+            <select id="spCompareYear"></select>
+            <select id="spCompareMonth"></select>
+            <select id="spCompareDay"></select>
+          </div>
+          <div class="preset-row">
+            <button class="preset-btn" type="button" data-model="sp" data-offset="1m">-1M</button>
+            <button class="preset-btn" type="button" data-model="sp" data-offset="3m">-3M</button>
+            <button class="preset-btn" type="button" data-model="sp" data-offset="1y">-1Y</button>
+          </div>
+          <div id="spCompareDates" class="chip-grid compact"></div>
+        </div>
+        <div class="status" id="spStatus"></div>
+        <div class="model-grid">
+          <div>
+            <div class="chart-toolbar">
+              <div class="chart-title">Curvas</div>
+              <a class="btn btn-ghost hidden-download" id="spCurvesDownload" href="#" download="cubic_spline_curves.csv">Descargar curvas</a>
+            </div>
+            <div id="spCurveChart" class="chart"></div>
+          </div>
+          <div>
+            <div class="chart-title">Observadas</div>
+            <div id="spObsChart" class="chart"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

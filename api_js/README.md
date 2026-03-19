@@ -9,6 +9,16 @@ Version 100% estatica del proyecto.
 - calcula Nelson-Siegel, Svensson y cubic spline en JavaScript
 - no necesita backend
 
+## Estructura
+
+- `index.html`: version en espanol
+- `index_en.html`: version en ingles
+- `css/styles.css`: estilos
+- `js/app.js`: interfaz, estado y graficos
+- `js/models.js`: modelos de curva
+- `data/market_rows.js`: base embebida
+- `data/market_rates.csv`: version tabular de apoyo
+
 ## Ejecutar local
 
 ```bash
