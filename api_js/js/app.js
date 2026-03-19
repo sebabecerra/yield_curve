@@ -26,6 +26,10 @@ const I18N = {
     observedRate: "Tasa observada",
     projectedRate: "Tasa proyectada",
     currentRate: "Tasa actual",
+    impliedPolicyRate: "TPM implícita",
+    forwardRate: "Tasa forward",
+    projectedNodes: "Nodos proyectados",
+    forwardCurve: "Curva forward",
     selectAtLeast3: "Selecciona al menos 3 tasas.",
     selectAtLeast4: "Selecciona al menos 4 tasas.",
     noCompleteDates: "No hay fechas completas para las columnas elegidas.",
@@ -36,6 +40,7 @@ const I18N = {
     horizon: "Horizonte",
     ar1Projection: "Proyección AR(1)",
     horizonSteps: "pasos",
+    currentLabel: "Actual",
     loadedBase: (rows, firstDate, lastDate, count) =>
       `Base real cargada: ${rows} filas, desde ${firstDate} hasta ${lastDate}. Fechas completas para el set base: ${count}.`,
     emptyBase: "La base integrada viene vacia o no se pudo parsear.",
@@ -54,6 +59,10 @@ const I18N = {
     observedRate: "Observed yield",
     projectedRate: "Projected yield",
     currentRate: "Current yield",
+    impliedPolicyRate: "Implied policy rate",
+    forwardRate: "Forward rate",
+    projectedNodes: "Projected nodes",
+    forwardCurve: "Forward curve",
     selectAtLeast3: "Select at least 3 rates.",
     selectAtLeast4: "Select at least 4 rates.",
     noCompleteDates: "No complete dates are available for the selected columns.",
@@ -64,6 +73,7 @@ const I18N = {
     horizon: "Horizon",
     ar1Projection: "AR(1) projection",
     horizonSteps: "steps",
+    currentLabel: "Current",
     loadedBase: (rows, firstDate, lastDate, count) =>
       `Embedded market dataset loaded: ${rows} rows, from ${firstDate} to ${lastDate}. Complete dates for the base set: ${count}.`,
     emptyBase: "The embedded dataset is empty or could not be parsed.",
@@ -119,7 +129,10 @@ function activatePanel(name) {
   document.querySelectorAll(".tab").forEach(tab => tab.classList.toggle("active", tab.dataset.panel === name));
   document.querySelectorAll(".panel").forEach(panel => panel.classList.toggle("active", panel.id === `panel-${name}`));
   if (name === "nelson-siegel") runNelsonSiegel();
-  if (name === "proyeccion") runProjection();
+  if (name === "proyeccion") {
+    state.calculations.pr = null;
+    runProjection();
+  }
   if (name === "svensson") runSvensson();
   if (name === "cubic-spline") runSpline();
 }
@@ -670,62 +683,56 @@ function plotProjection() {
   if (!calc) return;
   const baseDate = currentProjectionBaseDate();
   if (!baseDate) return;
-  const horizonLabel = document.getElementById("prHorizon").value;
-  const horizonSteps = PROJECTION_HORIZONS[horizonLabel] || PROJECTION_HORIZONS["1M"];
   const baseBeta = calc.betas.find(item => item.Date === baseDate);
   const baseObserved = calc.observed.find(item => item.Date === baseDate);
   if (!baseBeta || !baseObserved) {
     setStatus(projectionConfig.status, TEXT.noCompleteDates);
     return;
   }
-
-  const levelPath = projectAr1Series(calc.models.level, baseBeta.level, horizonSteps);
-  const slopePath = projectAr1Series(calc.models.slope, baseBeta.slope, horizonSteps);
-  const curvaturePath = projectAr1Series(calc.models.curvature, baseBeta.curvature, horizonSteps);
-  const projectedBeta = {
-    level: levelPath[levelPath.length - 1],
-    slope: slopePath[slopePath.length - 1],
-    curvature: curvaturePath[curvaturePath.length - 1],
-  };
-  const stepLabels = Array.from({ length: horizonSteps }, (_, index) => `t+${index + 1}`);
   const months = Array.from({ length: 120 }, (_, index) => index + 1);
   const currentCurve = reconstructNelsonSiegelCurve(months, baseBeta, calc.lambdaValue);
-  const projectedCurve = reconstructNelsonSiegelCurve(months, projectedBeta, calc.lambdaValue);
-
-  Plotly.newPlot(
-    projectionConfig.factor,
-    [
-      {
-        x: stepLabels,
-        y: levelPath,
-        type: "scatter",
-        mode: "lines",
-        name: "level",
-        line: { color: "#ffb000", width: 2.5 },
-        hovertemplate: `level<br>${TEXT.horizon}: %{x}<br>${TEXT.factor}: %{y:.2f}<extra></extra>`,
-      },
-      {
-        x: stepLabels,
-        y: slopePath,
-        type: "scatter",
-        mode: "lines",
-        name: "slope",
-        line: { color: "#35c2ff", width: 2.5 },
-        hovertemplate: `slope<br>${TEXT.horizon}: %{x}<br>${TEXT.factor}: %{y:.2f}<extra></extra>`,
-      },
-      {
-        x: stepLabels,
-        y: curvaturePath,
-        type: "scatter",
-        mode: "lines",
-        name: "curvature",
-        line: { color: "#ffd166", width: 2.5 },
-        hovertemplate: `curvature<br>${TEXT.horizon}: %{x}<br>${TEXT.factor}: %{y:.2f}<extra></extra>`,
-      },
-    ],
-    { ...plotLayout(TEXT.horizon, TEXT.factor), hovermode: "x unified" },
-    { responsive: true, displayModeBar: false },
-  );
+  const horizonEntries = Object.entries(PROJECTION_HORIZONS).map(([label, steps]) => {
+    const levelPath = projectAr1Series(calc.models.level, baseBeta.level, steps);
+    const slopePath = projectAr1Series(calc.models.slope, baseBeta.slope, steps);
+    const curvaturePath = projectAr1Series(calc.models.curvature, baseBeta.curvature, steps);
+    const projectedBeta = {
+      level: levelPath[levelPath.length - 1],
+      slope: slopePath[slopePath.length - 1],
+      curvature: curvaturePath[curvaturePath.length - 1],
+    };
+    return {
+      label,
+      steps,
+      levelPath,
+      slopePath,
+      curvaturePath,
+      projectedBeta,
+      curve: reconstructNelsonSiegelCurve(months, projectedBeta, calc.lambdaValue),
+    };
+  });
+  const horizonOrder = ["1M", "3M", "6M", "12M"];
+  const activeHorizonButtons = [...document.querySelectorAll('.preset-btn[data-model="pr"].active')];
+  const activeHorizons = activeHorizonButtons
+    .map(button => button.dataset.horizon)
+    .filter(Boolean)
+    .sort((a, b) => horizonOrder.indexOf(a) - horizonOrder.indexOf(b));
+  const visibleProjectedEntries = horizonEntries.filter(item => activeHorizons.includes(item.label));
+  const forwardCurveFromSpot = curve => {
+    const forwards = [];
+    for (let m = 1; m < curve.length; m += 1) {
+      const t1 = m / 12;
+      const t2 = (m + 1) / 12;
+      const z1 = (curve[m - 1] || 0) / 100;
+      const z2 = (curve[m] || 0) / 100;
+      const acc1 = (1 + z1) ** t1;
+      const acc2 = (1 + z2) ** t2;
+      const forward = ((acc2 / acc1) ** (1 / (t2 - t1))) - 1;
+      forwards.push(forward * 100);
+    }
+    return forwards;
+  };
+  const forwardMonths = months.slice(1);
+  const currentForwardCurve = forwardCurveFromSpot(currentCurve);
 
   Plotly.newPlot(
     projectionConfig.curve,
@@ -740,15 +747,6 @@ function plotProjection() {
         hovertemplate: `${TEXT.currentCurvePrefix}<br>${TEXT.date}: ${baseDate}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.currentRate}: %{y:.2f}<extra></extra>`,
       },
       {
-        x: months,
-        y: projectedCurve,
-        type: "scatter",
-        mode: "lines",
-        name: `${TEXT.projectedCurvePrefix} ${horizonLabel}`,
-        line: { color: "#ffb000", width: 3, dash: "dash" },
-        hovertemplate: `${TEXT.projectedCurvePrefix}<br>${TEXT.horizon}: ${horizonLabel}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.projectedRate}: %{y:.2f}<extra></extra>`,
-      },
-      {
         x: calc.columns.map(column => RATE_MONTHS[column]),
         y: calc.columns.map(column => baseObserved[column]),
         type: "scatter",
@@ -757,27 +755,119 @@ function plotProjection() {
         marker: { color: "#ffd166", size: 8, line: { color: "#081018", width: 1 } },
         hovertemplate: `${TEXT.observedPrefix}<br>${TEXT.date}: ${baseDate}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.rate}: %{y:.2f}<extra></extra>`,
       },
+      ...visibleProjectedEntries.map((item, index) => ({
+        x: months,
+        y: item.curve,
+        type: "scatter",
+        mode: "lines",
+        name: `${TEXT.projectedCurvePrefix} ${item.label}`,
+        line: {
+          color: ["#ffb000", "#ff6b6b", "#c792ea", "#7ae582"][index % 4],
+          width: 2.75,
+          dash: "dash",
+        },
+        hovertemplate: `${TEXT.projectedCurvePrefix}<br>${TEXT.horizon}: ${item.label}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.projectedRate}: %{y:.2f}<extra></extra>`,
+      })),
     ],
     { ...plotLayout(TEXT.maturityMonths, TEXT.rate), hovermode: "closest" },
     { responsive: true, displayModeBar: false },
   );
 
-  const projectedRows = stepLabels.map((label, index) => ({
-    HorizonStep: label,
-    level: levelPath[index],
-    slope: slopePath[index],
-    curvature: curvaturePath[index],
-  }));
+  Plotly.newPlot(
+    projectionConfig.factor,
+    [
+      {
+        x: forwardMonths,
+        y: currentForwardCurve,
+        type: "scatter",
+        mode: "lines",
+        name: `${TEXT.currentCurvePrefix} ${baseDate}`,
+        line: { color: "#35c2ff", width: 3 },
+        hovertemplate: `${TEXT.currentCurvePrefix}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.forwardRate}: %{y:.2f}<extra></extra>`,
+      },
+      ...visibleProjectedEntries.map((item, index) => ({
+        x: forwardMonths,
+        y: forwardCurveFromSpot(item.curve),
+        type: "scatter",
+        mode: "lines",
+        name: `${TEXT.projectedCurvePrefix} ${item.label}`,
+        line: {
+          color: ["#ffb000", "#ff6b6b", "#c792ea", "#7ae582"][index % 4],
+          width: 2.75,
+          dash: "dash",
+        },
+        hovertemplate: `${TEXT.projectedCurvePrefix}<br>${TEXT.horizon}: ${item.label}<br>${TEXT.maturityMonths}: %{x}<br>${TEXT.forwardRate}: %{y:.2f}<extra></extra>`,
+      })),
+    ],
+    { ...plotLayout(TEXT.maturityMonths, TEXT.forwardCurve), hovermode: "closest" },
+    { responsive: true, displayModeBar: false },
+  );
+
+  const projectedRows = [
+    {
+      Horizon: TEXT.currentLabel,
+      level: baseBeta.level,
+      slope: baseBeta.slope,
+      curvature: baseBeta.curvature,
+      TPM: currentCurve[0],
+      Rate3M: currentCurve[2],
+      Rate1Y: currentCurve[11],
+      Rate2Y: currentCurve[23],
+      Rate5Y: currentCurve[59],
+    },
+    ...visibleProjectedEntries.map(item => ({
+      Horizon: item.label,
+      level: item.projectedBeta.level,
+      slope: item.projectedBeta.slope,
+      curvature: item.projectedBeta.curvature,
+      TPM: item.curve[0],
+      Rate3M: item.curve[2],
+      Rate1Y: item.curve[11],
+      Rate2Y: item.curve[23],
+      Rate5Y: item.curve[59],
+    })),
+  ];
   const curveRows = months.map((month, index) => ({
     BaseDate: baseDate,
-    Horizon: horizonLabel,
+    Horizon: TEXT.currentLabel,
     MaturityMonths: month,
-    CurrentRate: currentCurve[index],
-    ProjectedRate: projectedCurve[index],
+    Rate: currentCurve[index],
   }));
+  visibleProjectedEntries.forEach(item => {
+    item.curve.forEach((rate, index) => {
+      curveRows.push({
+        BaseDate: baseDate,
+        Horizon: item.label,
+        MaturityMonths: months[index],
+        Rate: rate,
+      });
+    });
+  });
+  const forwardRows = forwardMonths.map((month, index) => ({
+    BaseDate: baseDate,
+    Horizon: TEXT.currentLabel,
+    MaturityMonths: month,
+    ForwardRate: currentForwardCurve[index],
+  }));
+  visibleProjectedEntries.forEach(item => {
+    const forwardCurve = forwardCurveFromSpot(item.curve);
+    forwardCurve.forEach((rate, index) => {
+      forwardRows.push({
+        BaseDate: baseDate,
+        Horizon: item.label,
+        MaturityMonths: forwardMonths[index],
+        ForwardRate: rate,
+      });
+    });
+  });
   setDownloadLink(projectionConfig.betasDownload, projectedRows);
   setDownloadLink(projectionConfig.curvesDownload, curveRows);
-  setStatus(projectionConfig.status, `${TEXT.projectionUpdated} ${horizonLabel} | AR(1), ${horizonSteps} ${TEXT.horizonSteps}.`);
+  setStatus(
+    projectionConfig.status,
+    visibleProjectedEntries.length
+      ? `${TEXT.projectionUpdated} ${visibleProjectedEntries.map(item => item.label).join(" / ")} | AR(1).`
+      : `${TEXT.projectionUpdated} ${TEXT.currentLabel}.`,
+  );
 }
 
 function plotModel(key) {
@@ -933,16 +1023,35 @@ try {
   document.querySelectorAll(".preset-btn").forEach(button => {
     button.addEventListener("click", () => {
       const key = button.dataset.model;
-      const baseDate = currentBaseDate(key);
+      if (key === "pr" && button.dataset.horizon) {
+        const select = document.getElementById("prHorizon");
+        if (select) {
+          select.value = button.dataset.horizon;
+        }
+        button.classList.toggle("active");
+        plotProjection();
+        return;
+      }
+      const baseDate = key === "pr" ? currentProjectionBaseDate() : currentBaseDate(key);
       if (!baseDate) return;
       const shifted = shiftDateString(baseDate, button.dataset.offset);
       const nearest = nearestAvailableDate(key, shifted);
-      if (nearest) addCompareChip(key, nearest);
+      if (!nearest) return;
+      if (key === "pr") {
+        setProjectionBaseDate(nearest, true);
+        return;
+      }
+      addCompareChip(key, nearest);
     });
   });
   document.getElementById("nsLambda")?.addEventListener("change", runNelsonSiegel);
   document.getElementById("prLambda")?.addEventListener("change", runProjection);
-  document.getElementById("prHorizon")?.addEventListener("change", plotProjection);
+  document.getElementById("prHorizon")?.addEventListener("change", event => {
+    const value = event.target.value;
+    const button = document.querySelector(`.preset-btn[data-model="pr"][data-horizon="${value}"]`);
+    if (button && !button.classList.contains("active")) button.classList.add("active");
+    plotProjection();
+  });
   document.getElementById("svLambda1")?.addEventListener("change", runSvensson);
   document.getElementById("svLambda2")?.addEventListener("change", runSvensson);
   document.getElementById("dataSortColumn").addEventListener("change", renderDataTable);

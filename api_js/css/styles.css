@@ -209,6 +209,11 @@ h1 {
 .preset-btn:hover {
   background: rgba(255,176,0,.12);
 }
+.preset-btn.active {
+  background: rgba(255,176,0,.22);
+  border-color: rgba(255,176,0,.58);
+  color: #ffe29a;
+}
 .field input:focus, .field select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px rgba(255,176,0,.28);

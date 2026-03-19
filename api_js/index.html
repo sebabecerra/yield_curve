@@ -32,9 +32,9 @@
         <button class="tab active" data-panel="modelo">Modelo</button>
         <button class="tab" data-panel="datos">Datos</button>
         <button class="tab" data-panel="nelson-siegel">Nelson-Siegel</button>
-        <button class="tab" data-panel="proyeccion">Proyección</button>
         <button class="tab" data-panel="svensson">Svensson</button>
         <button class="tab" data-panel="cubic-spline">Cubic spline</button>
+        <button class="tab" data-panel="proyeccion">Proyección</button>
       </div>
 
       <section class="panel active" id="panel-modelo">
@@ -232,34 +232,40 @@
               </div>
             </div>
             <div class="field">
-              <label>Horizonte</label>
+              <label>Horizonte destacado</label>
               <select id="prHorizon">
                 <option value="1M">1M</option>
                 <option value="3M">3M</option>
                 <option value="6M">6M</option>
                 <option value="12M">12M</option>
               </select>
+              <div class="preset-row">
+                <button class="preset-btn" type="button" data-model="pr" data-horizon="1M">+1M</button>
+                <button class="preset-btn" type="button" data-model="pr" data-horizon="3M">+3M</button>
+                <button class="preset-btn" type="button" data-model="pr" data-horizon="6M">+6M</button>
+                <button class="preset-btn" type="button" data-model="pr" data-horizon="12M">+12M</button>
+              </div>
             </div>
             <div class="field">
               <label>Supuesto</label>
-              <div class="assumption-box">AR(1) univariado por factor con persistencia histórica diaria y reconstrucción de curva futura desde betas esperados.</div>
+              <div class="assumption-box">AR(1) univariado por factor con persistencia histórica diaria. La curva actual estimada y la observada se muestran siempre; el horizonte seleccionado agrega la curva proyectada y su proxy de TPM implícita.</div>
             </div>
             <div class="status model-status" id="prStatus"></div>
           </div>
           <div class="model-charts">
             <div class="chart-panel">
               <div class="chart-toolbar">
-                <div class="chart-title">Trayectoria proyectada de factores</div>
-                <a class="btn btn-ghost hidden-download" id="prBetasDownload" href="#" download="projection_betas.csv">Descargar proyección</a>
-              </div>
-              <div id="prFactorChart" class="chart"></div>
-            </div>
-            <div class="chart-panel">
-              <div class="chart-toolbar">
-                <div class="chart-title">Curva actual vs proyectada</div>
+                <div class="chart-title">Curvas proyectadas por horizonte</div>
                 <a class="btn btn-ghost hidden-download" id="prCurvesDownload" href="#" download="projection_curves.csv">Descargar curvas</a>
               </div>
               <div id="prCurveChart" class="chart"></div>
+            </div>
+            <div class="chart-panel">
+              <div class="chart-toolbar">
+                <div class="chart-title">Curvas forward por horizonte</div>
+                <a class="btn btn-ghost hidden-download" id="prBetasDownload" href="#" download="projection_betas.csv">Descargar proyección</a>
+              </div>
+              <div id="prFactorChart" class="chart"></div>
             </div>
           </div>
         </div>
