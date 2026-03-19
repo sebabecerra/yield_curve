@@ -5,35 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Terminal de Analítica de la Curva de Tasas</title>
   <link rel="stylesheet" href="./css/styles.css" />
-  <script src="./config.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
-  <div class="access-overlay" id="accessOverlay">
-    <div class="access-card">
-      <div class="eyebrow">Acceso</div>
-      <h2 class="access-title">Ingresa tu email</h2>
-      <p class="access-copy">
-        El acceso a la plataforma requiere un correo con formato válido. Si configuras Google Sheets, el ingreso también queda registrado en una hoja central.
-      </p>
-      <div class="field">
-        <label for="accessEmail">Email</label>
-        <input id="accessEmail" type="email" placeholder="nombre@empresa.com" autocomplete="email" />
-      </div>
-      <button class="btn btn-primary access-btn" id="accessSubmit" type="button">Entrar a la plataforma</button>
-      <div class="status access-status" id="accessStatus"></div>
-    </div>
-  </div>
   <div class="shell">
     <section class="card hero">
       <div class="hero-topline">
         <div class="eyebrow">Terminal Analítica</div>
         <div class="hero-actions">
-          <div class="session-badge">
-            <span class="session-label">Sesión</span>
-            <span class="session-email" id="sessionEmail">-</span>
-            <button class="session-link" id="changeEmailBtn" type="button">Cerrar sesión</button>
-          </div>
           <div class="lang-switch">
           <a class="lang-link active" href="./index.html">ES</a>
           <a class="lang-link" href="./index_en.html">EN</a>

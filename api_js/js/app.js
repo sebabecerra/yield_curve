@@ -12,13 +12,8 @@ import {
 import { MARKET_ROWS } from "../data/market_rows.js";
 
 const LANG = document.documentElement.lang?.toLowerCase().startsWith("en") ? "en" : "es";
-const ACCESS_STORAGE_KEY = "yield_curve_access_email";
-const ACCESS_LOG_URL = (window.YC_ACCESS_LOG_URL || "").trim();
 const I18N = {
   es: {
-    accessInvalid: "Ingresa un email válido para continuar.",
-    accessStored: "Email actualizado.",
-    accessLogFailed: "No se pudo registrar el acceso remoto, pero el ingreso local sigue activo.",
     comparePlaceholder: "Ingrese fecha para comparar",
     loadedRows: "Filas cargadas",
     series: "Series",
@@ -47,9 +42,6 @@ const I18N = {
     failedLoad: "Fallo la carga de la base integrada.",
   },
   en: {
-    accessInvalid: "Enter a valid email to continue.",
-    accessStored: "Email updated.",
-    accessLogFailed: "Remote access logging failed, but local access remains active.",
     comparePlaceholder: "Add comparison date",
     loadedRows: "Loaded rows",
     series: "Series",
@@ -87,7 +79,6 @@ const PROJECTION_HORIZONS = {
 };
 const state = {
   rows: [],
-  accessEmail: "",
   availableDates: {
     ns: [],
     pr: [],
@@ -105,83 +96,6 @@ const state = {
 function setGlobalStatus(text) {
   const el = document.getElementById("globalStatus");
   if (el) el.textContent = text;
-}
-
-function isValidEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
-}
-
-function unlockAccess(email) {
-  state.accessEmail = email.trim();
-  localStorage.setItem(ACCESS_STORAGE_KEY, state.accessEmail);
-  document.body.classList.remove("access-locked");
-  document.getElementById("accessOverlay")?.classList.add("hidden");
-  const sessionEmail = document.getElementById("sessionEmail");
-  if (sessionEmail) sessionEmail.textContent = state.accessEmail;
-}
-
-async function logAccess(email) {
-  if (!ACCESS_LOG_URL) return { ok: false, skipped: true };
-  const payload = {
-    email: email.trim(),
-    language: LANG,
-    page: window.location.pathname,
-    userAgent: navigator.userAgent,
-  };
-  await fetch(ACCESS_LOG_URL, {
-    method: "POST",
-    body: JSON.stringify(payload),
-    mode: "no-cors",
-  });
-  return { ok: true };
-}
-
-function setupAccessGate() {
-  const input = document.getElementById("accessEmail");
-  const button = document.getElementById("accessSubmit");
-  const status = document.getElementById("accessStatus");
-  const changeButton = document.getElementById("changeEmailBtn");
-
-  const submit = async () => {
-    const email = input.value.trim();
-    if (!isValidEmail(email)) {
-      status.textContent = TEXT.accessInvalid;
-      return;
-    }
-    status.textContent = TEXT.accessStored;
-    try {
-      await logAccess(email);
-    } catch (error) {
-      status.textContent = TEXT.accessLogFailed;
-    }
-    unlockAccess(email);
-  };
-  button?.addEventListener("click", submit);
-  input?.addEventListener("keydown", event => {
-    if (event.key === "Enter") submit();
-  });
-
-  changeButton?.addEventListener("click", () => {
-    localStorage.removeItem(ACCESS_STORAGE_KEY);
-    state.accessEmail = "";
-    const overlay = document.getElementById("accessOverlay");
-    const sessionEmail = document.getElementById("sessionEmail");
-    if (sessionEmail) sessionEmail.textContent = "-";
-    if (overlay) overlay.classList.remove("hidden");
-    document.body.classList.add("access-locked");
-    if (input) {
-      input.value = "";
-      input.focus();
-    }
-    if (status) status.textContent = "";
-  });
-
-  const storedEmail = localStorage.getItem(ACCESS_STORAGE_KEY) || "";
-  if (isValidEmail(storedEmail)) {
-    unlockAccess(storedEmail);
-    return;
-  }
-  document.body.classList.add("access-locked");
 }
 
 const modelConfigs = {
@@ -1015,7 +929,6 @@ window.addEventListener("unhandledrejection", event => {
 });
 
 try {
-  setupAccessGate();
   document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => activatePanel(tab.dataset.panel)));
   document.querySelectorAll(".preset-btn").forEach(button => {
     button.addEventListener("click", () => {

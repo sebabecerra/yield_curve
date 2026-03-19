@@ -5,35 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Yield Curve Workstation</title>
   <link rel="stylesheet" href="./css/styles.css" />
-  <script src="./config.js"></script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 <body>
-  <div class="access-overlay" id="accessOverlay">
-    <div class="access-card">
-      <div class="eyebrow">Access</div>
-      <h2 class="access-title">Enter your email</h2>
-      <p class="access-copy">
-        Platform access requires a valid email format. If you configure Google Sheets, each access can also be written to a central log.
-      </p>
-      <div class="field">
-        <label for="accessEmail">Email</label>
-        <input id="accessEmail" type="email" placeholder="name@company.com" autocomplete="email" />
-      </div>
-      <button class="btn btn-primary access-btn" id="accessSubmit" type="button">Enter platform</button>
-      <div class="status access-status" id="accessStatus"></div>
-    </div>
-  </div>
   <div class="shell">
     <section class="card hero">
       <div class="hero-topline">
         <div class="eyebrow">Yield Curve Workstation</div>
         <div class="hero-actions">
-          <div class="session-badge">
-            <span class="session-label">Session</span>
-            <span class="session-email" id="sessionEmail">-</span>
-            <button class="session-link" id="changeEmailBtn" type="button">Sign out</button>
-          </div>
           <div class="lang-switch">
           <a class="lang-link" href="./index.html">ES</a>
           <a class="lang-link active" href="./index_en.html">EN</a>
