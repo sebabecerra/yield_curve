@@ -552,9 +552,14 @@ UI:
 - [`api_js/index_en.html`](/Users/sbc/projects/yiled_curve/api_js/index_en.html)
 - [`plotModel("kf")`](/Users/sbc/projects/yiled_curve/api_js/js/app.js)
 
-Notebook de validación:
+Notebooks relacionados:
 
 - [`old/notebooks/dynamic_nelson_siegel_kalman.ipynb`](/Users/sbc/projects/yiled_curve/old/notebooks/dynamic_nelson_siegel_kalman.ipynb)
+  Prototipo corto de validación del bloque `Kalman` de la app.
+- [`old/notebooks/diebold_li_kalman_forecast.ipynb`](/Users/sbc/projects/yiled_curve/old/notebooks/diebold_li_kalman_forecast.ipynb)
+  Desarrollo completo del flujo `Diebold-Li + Kalman + forecast`, incluyendo calibración de `lambda`, extracción OLS, `VAR(1)`, filtro, suavizado, curvas spot, curvas forward y extensión explícita al tramo swap cámara `SPC`.
+- [`old/notebooks/diebold_li_kalman_regime_switching.ipynb`](/Users/sbc/projects/yiled_curve/old/notebooks/diebold_li_kalman_regime_switching.ipynb)
+  Extensión con cambio de régimen sobre los factores suavizados, usando mezcla gaussiana para identificar dos estados y dinámica temporal específica por régimen.
 
 ### 11.9 Advertencia metodológica
 
